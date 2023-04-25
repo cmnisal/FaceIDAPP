@@ -1,0 +1,5 @@
+streamlit
+scikit-image
+mediapipe
+opencv-python
+watchdog
