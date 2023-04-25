@@ -1,5 +1,6 @@
 streamlit
 scikit-image
+scikit-learn
 mediapipe
 opencv-python
 watchdog
