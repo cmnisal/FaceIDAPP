@@ -2,5 +2,6 @@ streamlit
 scikit-image
 scikit-learn
 mediapipe
-opencv-python
+opencv-python-headless
 watchdog
+tflite-runtime==2.5.0

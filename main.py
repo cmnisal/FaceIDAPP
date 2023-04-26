@@ -362,10 +362,10 @@ def main():
     st.sidebar.markdown("## Face Detection")
     max_faces = st.sidebar.number_input("Maximum Number of Faces", value=2, min_value=1)
     detection_confidence = st.sidebar.slider(
-        "Min Detection Confidence", min_value=0.0, max_value=1.0, value=0.9
+        "Min Detection Confidence", min_value=0.0, max_value=1.0, value=0.5
     )
     tracking_confidence = st.sidebar.slider(
-        "Min Tracking Confidence", min_value=0.0, max_value=1.0, value=0.9
+        "Min Tracking Confidence", min_value=0.0, max_value=1.0, value=0.5
     )
     margin = st.sidebar.slider("Bounding box margin", 0, 100, 25, 1)
     scale = st.sidebar.slider(
@@ -383,7 +383,6 @@ def main():
         ["MobileNet", "ResNet"],
         index=0,
     )
-    print(model_name)
 
     class FaceIdentity:
         def __init__(self):
@@ -566,11 +565,11 @@ def main():
         frame = annotator.draw_landmarks(frame, detections[0])
         frame = annotator.draw_bounding_box(frame, detections[0], margin)
         frame = annotator.draw_text(frame, detections[0], recognitions[0], margin)
-        output_window.image(
-            frame, channels="BGR", caption="Output", use_column_width=True
-        )
         end_time = time.time()
         time_annotations = end_time - start_time
+
+        # OUTPUT VIDEO -----------------------------------------------------------
+        output_window.image(frame, channels="BGR", caption="Output", use_column_width=True)
 
         # CALCULATE FPS ----------------------------------------------------------
         currTime = time.time()
