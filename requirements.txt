@@ -4,4 +4,4 @@ scikit-learn
 mediapipe
 opencv-python-headless
 watchdog
-tflite-runtime==2.5.0
+tflite-runtime
