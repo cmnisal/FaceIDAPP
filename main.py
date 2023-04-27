@@ -1,7 +1,12 @@
 import streamlit as st
 import cv2
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase, RTCConfiguration
 import mediapipe as mp
+
+
+RTC_CONFIGURATION = RTCConfiguration(
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
 
 
 class OpenCVVideoProcessor(VideoProcessorBase):
@@ -53,8 +58,9 @@ def main():
     )
 
     webrtc_streamer(
-    key="sample",
+    key="myExample",
     mode=WebRtcMode.SENDRECV,
+    rtc_configuration=RTC_CONFIGURATION,
     video_processor_factory=OpenCVVideoProcessor,
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
