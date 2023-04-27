@@ -5,3 +5,4 @@ mediapipe
 opencv-python-headless
 watchdog
 tflite-runtime
+streamlit-webrtc
