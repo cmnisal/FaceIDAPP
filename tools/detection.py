@@ -17,7 +17,7 @@ class FaceDetector:
 
     def detect_faces(self, frame, scale, display):
         # Get the desired resize shape for image input
-        self.resized_shape = (int(self.shape[1] * scale), int(self.shape[0] * scale))
+        self.resized_shape = (int(self.shape[0] * scale), int(self.shape[1] * scale))
 
         # Resize the frame
         frame = cv2.resize(frame, self.resized_shape)

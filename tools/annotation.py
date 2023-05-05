@@ -6,15 +6,19 @@ FIVE_LANDMARKS = [470, 475, 1, 57, 287]
 
 
 class Annotator:
-    def __init__(self, shape):
-        self.shape = shape
+    def __init__(self):
         self.connections = mp.solutions.face_mesh_connections.FACEMESH_TESSELATION
 
-    def draw_bounding_box(self, img, landmarks, margin):
+    def draw_bounding_box(self, img, landmarks, recognition, margin):
         if not landmarks:
             return img
+        
+
         # Draw the bounding box on the original frame
-        for face_landmarks in landmarks:
+        for face_landmarks, identity in zip(landmarks, recognition):
+            
+            color = (255, 0, 0) if identity == "Unknown" else (0, 255, 0)
+
             x_coords = [
                 landmark.x * img.shape[1] for landmark in face_landmarks.landmark
             ]
@@ -25,21 +29,8 @@ class Annotator:
             x_min, x_max = int(min(x_coords) - margin), int(max(x_coords) + margin)
             y_min, y_max = int(min(y_coords) - margin), int(max(y_coords) + margin)
 
-            cv2.rectangle(img, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
-
-        # Add another filled bounding box below the previous one
-        for face_landmarks in landmarks:
-            x_coords = [
-                landmark.x * img.shape[1] for landmark in face_landmarks.landmark
-            ]
-            y_coords = [
-                landmark.y * img.shape[0] for landmark in face_landmarks.landmark
-            ]
-
-            x_min, x_max = int(min(x_coords) - margin), int(max(x_coords) + margin)
-            y_min, y_max = int(min(y_coords) - margin), int(max(y_coords) + margin)
-
-            cv2.rectangle(img, (x_min, y_min - 60), (x_max, y_min), (0, 255, 0), -1)
+            cv2.rectangle(img, (x_min, y_min), (x_max, y_max), color, 2)
+            cv2.rectangle(img, (x_min, y_min - img.shape[0] // 25), (x_max, y_min), color, -1)
 
         return img
 
@@ -53,6 +44,8 @@ class Annotator:
         font_color=(0, 0, 0),
         font=cv2.FONT_HERSHEY_SIMPLEX,
     ):
+        
+        font_scale = img.shape[0] / 1000
         if not landmarks:
             return img
         for face_landmarks, name in zip(landmarks, names):
@@ -63,13 +56,13 @@ class Annotator:
                 landmark.y * img.shape[0] for landmark in face_landmarks.landmark
             ]
 
-            x_min, x_max = int(min(x_coords) - margin), int(max(x_coords) + margin)
-            y_min, y_max = int(min(y_coords) - margin), int(max(y_coords) + margin)
+            x_min = int(min(x_coords) - margin)
+            y_min = int(min(y_coords) - margin)
 
             cv2.putText(
                 img,
                 name,
-                (x_min + 5, y_min - 20),
+                (x_min + img.shape[0] // 400, y_min - img.shape[0] // 100),
                 font,
                 font_scale,
                 font_color,
@@ -87,12 +80,12 @@ class Annotator:
                 cv2.line(
                     img,
                     (
-                        int(face_landmarks.landmark[connection[0]].x * self.shape[1]),
-                        int(face_landmarks.landmark[connection[0]].y * self.shape[0]),
+                        int(face_landmarks.landmark[connection[0]].x * img.shape[1]),
+                        int(face_landmarks.landmark[connection[0]].y * img.shape[0]),
                     ),
                     (
-                        int(face_landmarks.landmark[connection[1]].x * self.shape[1]),
-                        int(face_landmarks.landmark[connection[1]].y * self.shape[0]),
+                        int(face_landmarks.landmark[connection[1]].x * img.shape[1]),
+                        int(face_landmarks.landmark[connection[1]].y * img.shape[0]),
                     ),
                     (255, 255, 255),
                     1,
@@ -103,8 +96,8 @@ class Annotator:
                 cv2.circle(
                     img,
                     (
-                        int(face_landmark_point.x * self.shape[1]),
-                        int(face_landmark_point.y * self.shape[0]),
+                        int(face_landmark_point.x * img.shape[1]),
+                        int(face_landmark_point.y * img.shape[0]),
                     ),
                     1,
                     (0, 255, 0),
@@ -123,11 +116,11 @@ class Annotator:
                     (
                         int(
                             face_landmarks.landmark[face_landmark_point].x
-                            * self.shape[1]
+                            * img.shape[1]
                         ),
                         int(
                             face_landmarks.landmark[face_landmark_point].y
-                            * self.shape[0]
+                            * img.shape[0]
                         ),
                     ),
                     5,

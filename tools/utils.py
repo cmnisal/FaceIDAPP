@@ -5,7 +5,6 @@ def rgb(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(r, g, b)
 
 
-
 def show_images(images, names, num_cols, channels="RGB"):
     num_images = len(images)
 
