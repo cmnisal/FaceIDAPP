@@ -18,6 +18,8 @@ MAX_WEBCAM_WIDTH = 1920
 # - Fix Bug, when getting to second row for faces!
 # - Check what happens, if image has no face for gallery
 
+RTC_CONFIGURATION = {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+
 
 class SideBar:
     def __init__(self):
@@ -170,6 +172,7 @@ sb = SideBar()
 ctx = webrtc_streamer(
     key="FaceIDAppDemo",
     mode=WebRtcMode.SENDONLY,
+    rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={
         "video": {
             "width": {
