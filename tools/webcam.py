@@ -17,6 +17,7 @@ def init_webcam(width=680):
             },
             "audio": False,
         },
+        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
         video_receiver_size=1,
         async_processing=True,
     )
