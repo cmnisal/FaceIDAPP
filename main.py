@@ -12,7 +12,7 @@ ctx = webrtc_streamer(
     key="FaceIDAppDemo",
     mode=WebRtcMode.SENDONLY,
     media_stream_constraints={"video": True, "audio": False},
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun2.l.google.com:19305"]}]},
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
     video_receiver_size=1,
     async_processing=True,
 )
