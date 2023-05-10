@@ -139,7 +139,7 @@ detection_model = load_detection_model(max_faces=2, detection_confidence=0.5, tr
 identification_model = load_identification_model(name="MobileNet")
 
 # Gallery Processing
-with st.sidebar():
+with st.sidebar:
     gallery_images, gallery_embs, gallery_names= gallery_processing(sb.uploaded_files)
     st.markdown("**Gallery Faces**")
     show_images(gallery_images, gallery_names, 3)
