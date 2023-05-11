@@ -3,7 +3,7 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 
 # Streamlit app
-st.title("FaceID App Demonstration")
+st.title("Streamlit CommunityCloud Sample")
 
 # Instantiate WebRTC (and show start button)
 ctx = webrtc_streamer(
