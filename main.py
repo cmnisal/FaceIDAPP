@@ -12,7 +12,7 @@ from streamlit_toggle import st_toggle_switch
 import pandas as pd
 from nametypes import Stats, Detection
 from pathlib import Path
-from utils import get_ice_servers, download_file, format_floats, display_match, rgb
+from utils import get_ice_servers, download_file, display_match, rgb
 from face_recognition import (
     detect_faces,
     align_faces,
