@@ -62,7 +62,7 @@ def align_faces(img, detections):
         )
     return updated_detections
 
-
+# TODO Error when uploading image while running!
 def inference(detections, model):
     updated_detections = []
     faces = [detection.face for detection in detections if detection.face is not None]
