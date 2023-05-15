@@ -1,9 +1,13 @@
 import streamlit as st
 import time
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import logging
 import os
+import av
 from twilio.rest import Client
+import queue
+from typing import List, NamedTuple
+import numpy as np
 
 
 account_sid = os.environ["TWILIO_ACCOUNT_SID"]
@@ -15,12 +19,17 @@ token = client.tokens.create()
 RTC_CONFIGURATION = {"iceServers": token.ice_servers}
 
 
+class Stats(NamedTuple):
+    framerate: float
+
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
 logging.basicConfig(level=logging.ERROR)
 
 
 # Set page layout for streamlit to wide
 st.set_page_config(layout="wide")
+
+result_queue: "queue.Queue[Stats]" = queue.Queue()
 
 
 class KPI:
@@ -47,41 +56,23 @@ class KPI:
                 unsafe_allow_html=True,
             )
 
-
-# -----------------------------------------------------------------------------------------------
-# Streamlit App
-st.title("FaceID App Demonstration")
-
-# Get Access to Webcam
-import streamlit as st
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
-import time
-import mediapipe as mp
-import numpy as np
-import av
-import cv2
-
-
-class FaceDetector(VideoProcessorBase):
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format="rgb24")
-        start = time.time()
-        results = self.facedetector.process(img)
-        img = self.annotate_mesh(img, results)
-        stop = time.time()
-        img = self.annotate_fps(img, 1 / (stop - start))
-        return av.VideoFrame.from_ndarray(img, format="rgb24")
+def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+    start = time.time()
+    img = frame.to_ndarray(format="rgb24")
+    time.sleep(0.25)
+    stop = time.time()
+    result_queue.put(Stats(1 / (stop - start)))
+    return av.VideoFrame.from_ndarray(img, format="rgb24")
 
 
 # Streamlit app
-
 st.title("FaceID App Demonstration")
 
 ctx = webrtc_streamer(
     key="FaceIDAppDemo",
     mode=WebRtcMode.SENDRECV,
     rtc_configuration=RTC_CONFIGURATION,
-    video_processor_factory=FaceDetector,
+    video_frame_callback=video_frame_callback,
     media_stream_constraints={"video": True, "audio": False},
     async_processing=True,
 )
@@ -92,7 +83,9 @@ st.markdown("**Stats**")
 kpi = KPI(["**FrameRate**"])
 st.markdown("---")
 
-# Live Stream Display
-stream_display = st.empty()
-st.markdown("---")
-
+if ctx.state.playing:
+    while True:
+        stats = result_queue.get()
+        kpi.update_kpi([stats.framerate])
+        print(stats.framerate)
+        time.sleep(0.1)
