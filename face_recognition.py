@@ -1,6 +1,7 @@
 from nametypes import Detection, Identity
 import numpy as np
 import cv2
+import streamlit as st
 from sklearn.metrics.pairwise import cosine_distances
 from skimage.transform import SimilarityTransform
 
@@ -84,6 +85,9 @@ def inference(detections, model):
 
 def recognize_faces(detections, gallery, thresh=0.67):
 
+    if len(gallery) == 0 or len(detections) == 0:
+        return detections
+
     gallery_embs = np.asarray([identity.embedding for identity in gallery])
     detection_embs = np.asarray([detection.emdedding for detection in detections])
 
@@ -100,31 +104,14 @@ def recognize_faces(detections, gallery, thresh=0.67):
             pred = idx_min
         updated_detections.append(
             detection._replace(
-                name=gallery[pred].name if pred is not None else "Unknown",
-                emdedding=gallery[pred].embedding if pred is not None else None,
+                name=gallery[pred].name.split(".jpg")[0].split(".png")[0].split(".jpeg")[0] if pred is not None else None,
+                emdedding_match=gallery[pred].embedding if pred is not None else None,
+                face_match=gallery[pred].image if pred is not None else None,
                 distance=dist,
             )
         )
 
     return updated_detections
-
-
-def identify(embs_src, embs_gal, labels_gal, imgs_gal, thresh=None):
-    all_dists = cosine_distances(embs_src, embs_gal)
-    ident_names, ident_dists, ident_imgs = [], [], []
-    for dists in all_dists:
-        idx_min = np.argmin(dists)
-        if thresh and dists[idx_min] > thresh:
-            dist = dists[idx_min]
-            pred = None
-        else:
-            dist = dists[idx_min]
-            pred = idx_min
-        ident_names.append(labels_gal[pred] if pred is not None else "Unknown")
-        ident_dists.append(dist)
-        ident_imgs.append(imgs_gal[pred] if pred is not None else None)
-    return ident_names, ident_dists, ident_imgs
-
 
 
 def process_gallery(files, face_detection_model, face_recognition_model):

@@ -8,6 +8,8 @@ class Detection(NamedTuple):
     name: str = None
     face: np.ndarray = None
     emdedding: np.ndarray = None
+    emdedding_match: np.ndarray = None
+    face_match: np.ndarray = None
     distance: float = None
 
 
@@ -15,14 +17,12 @@ class Stats(NamedTuple):
     fps: float
     resolution: List[int]
     num_faces: int
-
-
-class Timings(NamedTuple):
     detection: float
     normalization: float
     inference: float
     recognition: float
     drawing: float
+    
 
 class Identity(NamedTuple):
     name: str

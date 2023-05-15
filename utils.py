@@ -5,6 +5,8 @@ from pathlib import Path
 import streamlit as st
 from twilio.rest import Client
 import os
+import cv2
+import numpy as np
 import hashlib
 
 
@@ -114,7 +116,7 @@ def download_file(url, model_path: Path, file_hash=None):
         try:
             weights_warning = st.warning("Downloading %s..." % url)
             progress_bar = st.progress(0)
-            with open(model_dir, "wb") as output_file:
+            with open(model_path, "wb") as output_file:
                 with urllib.request.urlopen(url) as response:
                     length = int(response.info()["Content-Length"])
                     counter = 0.0
@@ -139,3 +141,32 @@ def download_file(url, model_path: Path, file_hash=None):
                 weights_warning.empty()
             if progress_bar is not None:
                 progress_bar.empty()
+
+
+# Function to format floats within a list
+def format_floats(val):
+    if isinstance(val, list): 
+        return [f"{num:.2f}" for num in val]
+    if isinstance(val, np.ndarray):
+        return np.asarray([f"{num:.2f}" for num in val])
+    else:
+        return val
+    
+
+def display_match(d):
+    im = np.concatenate([d.face, d.face_match])
+    border_size = 2
+    border = cv2.copyMakeBorder(
+        im,
+        top=border_size,
+        bottom=border_size,
+        left=border_size,
+        right=border_size,
+        borderType=cv2.BORDER_CONSTANT,
+        value=(255, 255, 120)
+    )
+    return border
+
+
+def rgb(r, g, b):
+    return '#{:02x}{:02x}{:02x}'.format(r, g, b)
