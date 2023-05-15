@@ -1,7 +1,18 @@
 import streamlit as st
 import time
-from tools.webcam import init_webcam
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
 import logging
+import os
+from twilio.rest import Client
+
+
+account_sid = os.environ["TWILIO_ACCOUNT_SID"]
+auth_token = os.environ["TWILIO_AUTH_TOKEN"]
+client = Client(account_sid, auth_token)
+
+token = client.tokens.create()
+
+RTC_CONFIGURATION = {"iceServers": token.ice_servers}
 
 
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
@@ -42,7 +53,39 @@ class KPI:
 st.title("FaceID App Demonstration")
 
 # Get Access to Webcam
-webcam = init_webcam()
+import streamlit as st
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
+import time
+import mediapipe as mp
+import numpy as np
+import av
+import cv2
+
+
+class FaceDetector(VideoProcessorBase):
+    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+        img = frame.to_ndarray(format="rgb24")
+        start = time.time()
+        results = self.facedetector.process(img)
+        img = self.annotate_mesh(img, results)
+        stop = time.time()
+        img = self.annotate_fps(img, 1 / (stop - start))
+        return av.VideoFrame.from_ndarray(img, format="rgb24")
+
+
+# Streamlit app
+
+st.title("FaceID App Demonstration")
+
+ctx = webrtc_streamer(
+    key="FaceIDAppDemo",
+    mode=WebRtcMode.SENDRECV,
+    rtc_configuration=RTC_CONFIGURATION,
+    video_processor_factory=FaceDetector,
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True,
+)
+
 
 # KPI Section
 st.markdown("**Stats**")
@@ -53,27 +96,3 @@ st.markdown("---")
 stream_display = st.empty()
 st.markdown("---")
 
-if webcam:
-    prevTime = 0
-    while True:
-        try:
-            # Get Frame from Webcam
-            frame = webcam.get_frame(timeout=1)
-
-            # Convert to OpenCV Image
-            frame = frame.to_ndarray(format="rgb24")
-        except:
-            continue
-
-        # DISPLAY THE LIVE STREAM --------------------------------------------------
-        stream_display.image(
-            frame, channels="RGB", caption="Live-Stream", use_column_width=True
-        )
-
-        # CALCULATE FPS -----------------------------------------------------------
-        currTime = time.time()
-        fps = 1 / (currTime - prevTime)
-        prevTime = currTime
-
-        # UPDATE KPIS -------------------------------------------------------------
-        kpi.update_kpi([fps])
