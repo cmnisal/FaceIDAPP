@@ -1,14 +1,13 @@
-# FaceIDAPP
-A streamlit app to demonstrate a simple face-recognition application in python
+---
+title: LiveFaceID
+emoji: 🐢
+colorFrom: gray
+colorTo: pink
+sdk: streamlit
+sdk_version: 1.19.0
+app_file: app.py
+pinned: false
+license: mit
+---
 
-
-pip install tflite_runtime==2.5.0.post1 --find-links https://google-coral.github.io/py-repo/tflite-runtime
-
-
-
-It works via https:// --- ssl-proxy in local network: 
-
-https://github.com/suyashkumar/ssl-proxy
-
-This is working!
-https://github.com/whitphx/streamlit-webrtc
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

@@ -3,6 +3,9 @@ scikit-image
 scikit-learn
 mediapipe
 opencv-python-headless
+watchdog
 streamlit-webrtc
-tflite-runtime
+matplotlib
 streamlit-toggle-switch
+tflite-runtime
+twilio
