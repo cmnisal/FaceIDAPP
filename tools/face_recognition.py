@@ -1,7 +1,6 @@
-from nametypes import Detection, Identity
+from .nametypes import Detection, Identity
 import numpy as np
 import cv2
-import streamlit as st
 from sklearn.metrics.pairwise import cosine_distances
 from skimage.transform import SimilarityTransform
 
