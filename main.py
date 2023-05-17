@@ -202,11 +202,8 @@ ctx = webrtc_streamer(
         },
         "audio": False,
     },
-    async_processing=False,  # WHAT IS THIS?
+    async_processing=True,  # WHAT IS THIS?
 )
-
-st.markdown("**Timings [ms]**")
-timings = st.empty()
 
 st.markdown("**Identified Faces**")
 identified_faces = st.empty()
