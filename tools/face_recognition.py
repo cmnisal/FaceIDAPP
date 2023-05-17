@@ -149,13 +149,8 @@ def process_gallery(files, face_detection_model, face_recognition_model):
 
 
 def draw_detections(
-    frame, detections, bbox=True, landmarks=True, name=True, upscale=True
+    frame, detections, bbox=True, landmarks=True, name=True,
 ):
-    if upscale:
-        frame = cv2.resize(
-            frame, (1920, 1080)
-        )  # Upscale frame for better visualization
-
     shape = np.asarray(frame.shape[:2][::-1])
 
     for detection in detections:
@@ -165,7 +160,7 @@ def draw_detections(
                 cv2.circle(
                     frame,
                     (np.asarray(landmark) * shape).astype(int),
-                    5,
+                    2,
                     (0, 0, 255),
                     -1,
                 )
@@ -200,8 +195,8 @@ def draw_detections(
                     int(detection.bbox[0] * shape[0] + shape[0] // 400),
                     int(detection.bbox[1] * shape[1] - shape[1] // 100),
                 ),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
+                cv2.LINE_AA,
+                0.5,
                 (0, 0, 0),
                 2,
             )

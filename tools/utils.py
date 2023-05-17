@@ -8,6 +8,9 @@ import os
 import cv2
 import numpy as np
 import hashlib
+from collections import deque
+import cv2 as cv
+
 
 
 logger = logging.getLogger(__name__)
@@ -173,3 +176,4 @@ def display_match(d):
 
 def rgb(r, g, b):
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
+

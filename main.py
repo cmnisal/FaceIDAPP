@@ -22,9 +22,6 @@ from tools.face_recognition import (
     process_gallery,
 )
 
-# TODO Error Handling!
-
-
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
@@ -177,8 +174,6 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     # Send data to other thread
     detections_queue.put(detections)
     stats_queue.put(stats)
-
-    time.sleep(0.5)
 
     return frame
 
