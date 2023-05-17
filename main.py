@@ -117,6 +117,19 @@ else:
     )
     st.session_state[cache_key] = face_detection_model
 
+# Session-specific caching of the face detection model
+cache_key = "face_detection_model_gal"
+if cache_key in st.session_state:
+    face_detection_model_gal = st.session_state[cache_key]
+else:
+    face_detection_model_gal = mp.solutions.face_mesh.FaceMesh(
+        refine_landmarks=True,
+        min_detection_confidence=detection_confidence,
+        min_tracking_confidence=tracking_confidence,
+        max_num_faces=max_faces,
+    )
+    st.session_state[cache_key] = face_detection_model_gal
+
 stats_queue: "queue.Queue[Stats]" = queue.Queue()
 detections_queue: "queue.Queue[List[Detection]]" = queue.Queue()
 
@@ -172,8 +185,8 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     stats = stats._replace(fps=1 / (time.time() - frame_start))
 
     # Send data to other thread
-    detections_queue.put(detections)
-    stats_queue.put(stats)
+    detections_queue.put_nowait(detections)
+    stats_queue.put_nowait(stats)
 
     return frame
 
@@ -186,7 +199,7 @@ gallery = st.sidebar.file_uploader(
     "Upload images to gallery", type=["png", "jpg", "jpeg"], accept_multiple_files=True
 )
 if gallery:
-    gallery = process_gallery(gallery, face_detection_model, face_recognition_model_gal)
+    gallery = process_gallery(gallery, face_detection_model_gal, face_recognition_model_gal)
     st.sidebar.markdown("**Gallery Images**")
     st.sidebar.image(
         [identity.image for identity in gallery],
@@ -230,13 +243,13 @@ detections = st.empty()
 if ctx.state.playing:
     while True:
         # Get stats
-        stats_dataframe = pd.DataFrame([stats_queue.get()])
+        stats_dataframe = pd.DataFrame([stats_queue.get(timeout=10)])
 
         # Write stats to streamlit
         stats.dataframe(stats_dataframe.style.format(thousands=" ", precision=2))
 
         # Get detections
-        detections_data = detections_queue.get()
+        detections_data = detections_queue.get(timeout=10)
         detections_dataframe = (
             pd.DataFrame(detections_data)
             .drop(columns=["face", "face_match"], errors="ignore")
