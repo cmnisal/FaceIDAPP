@@ -78,7 +78,7 @@ def inference(detections, model):
         ]
 
         for idx, detection in enumerate(detections):
-            updated_detections.append(detection._replace(emdedding=embs[idx]))
+            updated_detections.append(detection._replace(embedding=embs[idx]))
     return updated_detections
 
 
@@ -88,7 +88,7 @@ def recognize_faces(detections, gallery, thresh=0.67):
         return detections
 
     gallery_embs = np.asarray([identity.embedding for identity in gallery])
-    detection_embs = np.asarray([detection.emdedding for detection in detections])
+    detection_embs = np.asarray([detection.embedding for detection in detections])
 
     cos_distances = cosine_distances(detection_embs, gallery_embs)
 
@@ -104,7 +104,7 @@ def recognize_faces(detections, gallery, thresh=0.67):
         updated_detections.append(
             detection._replace(
                 name=gallery[pred].name.split(".jpg")[0].split(".png")[0].split(".jpeg")[0] if pred is not None else None,
-                emdedding_match=gallery[pred].embedding if pred is not None else None,
+                embedding_match=gallery[pred].embedding if pred is not None else None,
                 face_match=gallery[pred].image if pred is not None else None,
                 distance=dist,
             )
@@ -135,7 +135,7 @@ def process_gallery(files, face_detection_model, face_recognition_model):
         gallery.append(
             Identity(
                 name=file.name,
-                embedding=detections[0].emdedding,
+                embedding=detections[0].embedding,
                 image=detections[0].face,
             )
         )
