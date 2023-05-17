@@ -220,7 +220,7 @@ ctx = webrtc_streamer(
         },
         "audio": False,
     },
-    async_processing=True,
+    async_processing=False,
 )
 
 st.markdown("**Identified Faces**")
