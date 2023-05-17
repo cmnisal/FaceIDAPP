@@ -143,11 +143,11 @@ def download_file(url, model_path: Path, file_hash=None):
 
 
 # Function to format floats within a list
-def format_list(val):
+def format_dflist(val):
     if isinstance(val, list):
-        return [format_list(num) for num in val]
+        return [format_dflist(num) for num in val]
     if isinstance(val, np.ndarray):
-        return np.asarray([format_list(num) for num in val])
+        return np.asarray([format_dflist(num) for num in val])
     if isinstance(val, np.float32):
         return f"{val:.2f}"
     if isinstance(val, float):

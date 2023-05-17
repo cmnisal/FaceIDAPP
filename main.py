@@ -12,7 +12,7 @@ from streamlit_toggle import st_toggle_switch
 import pandas as pd
 from tools.nametypes import Stats, Detection
 from pathlib import Path
-from tools.utils import get_ice_servers, download_file, display_match, rgb, format_list
+from tools.utils import get_ice_servers, download_file, display_match, rgb, format_dflist
 from tools.face_recognition import (
     detect_faces,
     align_faces,
@@ -243,7 +243,7 @@ if ctx.state.playing:
         detections_dataframe = (
             pd.DataFrame(detections_data)
             .drop(columns=["face", "face_match"], errors="ignore")
-            .applymap(lambda x: (format_list(x)))
+            .applymap(lambda x: (format_dflist(x)))
         )
 
         # Write detections to streamlit
