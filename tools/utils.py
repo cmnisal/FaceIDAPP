@@ -110,7 +110,6 @@ def download_file(url, model_path: Path, file_hash=None):
         download = True
 
     if download:
-
         # These are handles to two visual elements to animate.
         weights_warning, progress_bar = None, None
         try:
@@ -145,8 +144,8 @@ def download_file(url, model_path: Path, file_hash=None):
 
 # Function to format floats within a list
 def format_list(val):
-    if isinstance(val, list): 
-        return [format_list(num) for num in val ]
+    if isinstance(val, list):
+        return [format_list(num) for num in val]
     if isinstance(val, np.ndarray):
         return np.asarray([format_list(num) for num in val])
     if isinstance(val, np.float32):
@@ -155,7 +154,7 @@ def format_list(val):
         return f"{val:.2f}"
     else:
         return val
-    
+
 
 def display_match(d):
     im = np.concatenate([d.face, d.face_match])
@@ -167,10 +166,10 @@ def display_match(d):
         left=border_size,
         right=border_size,
         borderType=cv2.BORDER_CONSTANT,
-        value=(255, 255, 120)
+        value=(255, 255, 120),
     )
     return border
 
 
 def rgb(r, g, b):
-    return '#{:02x}{:02x}{:02x}'.format(r, g, b)
+    return "#{:02x}{:02x}{:02x}".format(r, g, b)

@@ -62,6 +62,7 @@ def align_faces(img, detections):
         )
     return updated_detections
 
+
 # TODO Error when uploading image while running!
 def inference(detections, model):
     updated_detections = []
@@ -83,7 +84,6 @@ def inference(detections, model):
 
 
 def recognize_faces(detections, gallery, thresh=0.67):
-
     if len(gallery) == 0 or len(detections) == 0:
         return detections
 
@@ -103,7 +103,12 @@ def recognize_faces(detections, gallery, thresh=0.67):
             pred = idx_min
         updated_detections.append(
             detection._replace(
-                name=gallery[pred].name.split(".jpg")[0].split(".png")[0].split(".jpeg")[0] if pred is not None else None,
+                name=gallery[pred]
+                .name.split(".jpg")[0]
+                .split(".png")[0]
+                .split(".jpeg")[0]
+                if pred is not None
+                else None,
                 embedding_match=gallery[pred].embedding if pred is not None else None,
                 face_match=gallery[pred].image if pred is not None else None,
                 distance=dist,

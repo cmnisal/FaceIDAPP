@@ -63,7 +63,9 @@ with st.sidebar:
     st.markdown("Note: To change the resolution, you have to restart the stream.")
 
     ice_server = st.selectbox("ICE Server", ["twilio", "metered"], index=0)
-    st.markdown("Note: metered is a free server with limited bandwidth, and can take a while to connect. Twilio is a paid service and is payed by me, so please don't abuse it.")
+    st.markdown(
+        "Note: metered is a free server with limited bandwidth, and can take a while to connect. Twilio is a paid service and is payed by me, so please don't abuse it."
+    )
 
     st.markdown("## Face Detection")
     max_faces = st.number_input("Maximum Number of Faces", value=2, min_value=1)
@@ -77,7 +79,9 @@ with st.sidebar:
     similarity_threshold = st.slider(
         "Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67
     )
-    st.markdown("This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized.")
+    st.markdown(
+        "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
+    )
 
 download_file(
     MODEL_URL,
@@ -98,7 +102,9 @@ cache_key = "face_id_model_gal"
 if cache_key in st.session_state:
     face_recognition_model_gal = st.session_state[cache_key]
 else:
-    face_recognition_model_gal = tflite.Interpreter(model_path=MODEL_LOCAL_PATH.as_posix())
+    face_recognition_model_gal = tflite.Interpreter(
+        model_path=MODEL_LOCAL_PATH.as_posix()
+    )
     st.session_state[cache_key] = face_recognition_model_gal
 
 # Session-specific caching of the face detection model
@@ -118,11 +124,10 @@ stats_queue: "queue.Queue[Stats]" = queue.Queue()
 detections_queue: "queue.Queue[List[Detection]]" = queue.Queue()
 
 
-
 def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     # Initialize detections
     detections = []
-    
+
     # Initialize stats
     stats = Stats()
 
@@ -152,7 +157,7 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
         start = time.time()
         detections = inference(detections, face_recognition_model)
         stats = stats._replace(inference=(time.time() - start) * 1000)
-        
+
         # Run face recognition
         start = time.time()
         detections = recognize_faces(detections, gallery, similarity_threshold)
@@ -235,13 +240,15 @@ if ctx.state.playing:
 
         # Get detections
         detections_data = detections_queue.get()
-        detections_dataframe = pd.DataFrame(detections_data).drop(
-            columns=["face", "face_match"], errors="ignore"
-        ).applymap(lambda x: (format_list(x)))
-        
+        detections_dataframe = (
+            pd.DataFrame(detections_data)
+            .drop(columns=["face", "face_match"], errors="ignore")
+            .applymap(lambda x: (format_list(x)))
+        )
+
         # Write detections to streamlit
         detections.dataframe(detections_dataframe)
-        
+
         # Write identified faces to streamlit
         identified_faces.image(
             [display_match(d) for d in detections_data if d.name is not None],
