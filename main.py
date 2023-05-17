@@ -148,20 +148,20 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
         stats = stats._replace(num_faces=len(detections) if detections else 0)
         stats = stats._replace(detection=(time.time() - start) * 1000)
 
-        # # Run face alignment
-        # start = time.time()
-        # detections = align_faces(frame, detections)
-        # stats = stats._replace(alignment=(time.time() - start) * 1000)
+        # Run face alignment
+        start = time.time()
+        detections = align_faces(frame, detections)
+        stats = stats._replace(alignment=(time.time() - start) * 1000)
 
-        # # Run inference
-        # start = time.time()
-        # detections = inference(detections, face_recognition_model)
-        # stats = stats._replace(inference=(time.time() - start) * 1000)
+        # Run inference
+        start = time.time()
+        detections = inference(detections, face_recognition_model)
+        stats = stats._replace(inference=(time.time() - start) * 1000)
 
-        # # Run face recognition
-        # start = time.time()
-        # detections = recognize_faces(detections, gallery, similarity_threshold)
-        # stats = stats._replace(recognition=(time.time() - start) * 1000)
+        # Run face recognition
+        start = time.time()
+        detections = recognize_faces(detections, gallery, similarity_threshold)
+        stats = stats._replace(recognition=(time.time() - start) * 1000)
 
         # Draw detections
         start = time.time()
@@ -177,6 +177,8 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     # Send data to other thread
     detections_queue.put(detections)
     stats_queue.put(stats)
+
+    time.sleep(0.5)
 
     return frame
 
@@ -220,7 +222,7 @@ ctx = webrtc_streamer(
         },
         "audio": False,
     },
-    async_processing=False,
+    async_processing=True,
 )
 
 st.markdown("**Identified Faces**")
