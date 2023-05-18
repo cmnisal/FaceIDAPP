@@ -269,3 +269,6 @@ if ctx.state.playing:
             ],
             width=112,
         )
+
+
+# TODO: Issue with detected Face in "Identified Faces Display" Face is lagging, but Distance is updating? WTF?
