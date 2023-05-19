@@ -1,0 +1,8 @@
+streamlit
+scikit-image
+scikit-learn
+mediapipe
+opencv-python-headless
+streamlit-webrtc
+tflite-runtime
+streamlit-toggle-switch

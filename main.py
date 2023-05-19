@@ -243,13 +243,15 @@ detections = st.empty()
 if ctx.state.playing:
     while True:
         # Get stats
-        stats_dataframe = pd.DataFrame([stats_queue.get(timeout=10)])
+        stats_data = stats_queue.get()
+        stats_dataframe = pd.DataFrame([stats_data])
+        stats_dataframe.style.format(thousands=" ", precision=2)
 
         # Write stats to streamlit
-        stats.dataframe(stats_dataframe.style.format(thousands=" ", precision=2))
+        stats.dataframe(stats_dataframe)
 
         # Get detections
-        detections_data = detections_queue.get(timeout=10)
+        detections_data = detections_queue.get()
         detections_dataframe = (
             pd.DataFrame(detections_data)
             .drop(columns=["face", "face_match"], errors="ignore")
