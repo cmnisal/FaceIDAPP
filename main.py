@@ -12,30 +12,15 @@ from streamlit_toggle import st_toggle_switch
 import pandas as pd
 from tools.nametypes import Stats, Detection
 from pathlib import Path
-from tools.utils import get_ice_servers, download_file, display_match, rgb, format_dflist
-from tools.face_recognition import (
-    detect_faces,
-    align_faces,
-    inference,
-    draw_detections,
-    recognize_faces,
-    process_gallery,
-)
+from tools.utils import get_ice_servers, display_match, rgb, format_dflist
+from tools.face_detection import FaceDetection
+from tools.face_recognition import FaceRecognition
+
 
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 
-ROOT = Path(__file__).parent
-
-MODEL_URL = (
-    "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/mobileNet.tflite"
-)
-MODEL_LOCAL_PATH = ROOT / "./models/mobileNet.tflite"
-
-DETECTION_CONFIDENCE = 0.5
-TRACKING_CONFIDENCE = 0.5
-MAX_FACES = 2
 
 # Set page layout for streamlit to wide
 st.set_page_config(
@@ -80,55 +65,8 @@ with st.sidebar:
         "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
     )
 
-download_file(
-    MODEL_URL,
-    MODEL_LOCAL_PATH,
-    file_hash="6c19b789f661caa8da735566490bfd8895beffb2a1ec97a56b126f0539991aa6",
-)
-
-# Session-specific caching of the face recognition model
-cache_key = "face_id_model"
-if cache_key in st.session_state:
-    face_recognition_model = st.session_state[cache_key]
-else:
-    face_recognition_model = tflite.Interpreter(model_path=MODEL_LOCAL_PATH.as_posix())
-    st.session_state[cache_key] = face_recognition_model
-
-# Session-specific caching of the face recognition model
-cache_key = "face_id_model_gal"
-if cache_key in st.session_state:
-    face_recognition_model_gal = st.session_state[cache_key]
-else:
-    face_recognition_model_gal = tflite.Interpreter(
-        model_path=MODEL_LOCAL_PATH.as_posix()
-    )
-    st.session_state[cache_key] = face_recognition_model_gal
-
-# Session-specific caching of the face detection model
-cache_key = "face_detection_model"
-if cache_key in st.session_state:
-    face_detection_model = st.session_state[cache_key]
-else:
-    face_detection_model = mp.solutions.face_mesh.FaceMesh(
-        refine_landmarks=True,
-        min_detection_confidence=detection_confidence,
-        min_tracking_confidence=tracking_confidence,
-        max_num_faces=max_faces,
-    )
-    st.session_state[cache_key] = face_detection_model
-
-# Session-specific caching of the face detection model
-cache_key = "face_detection_model_gal"
-if cache_key in st.session_state:
-    face_detection_model_gal = st.session_state[cache_key]
-else:
-    face_detection_model_gal = mp.solutions.face_mesh.FaceMesh(
-        refine_landmarks=True,
-        min_detection_confidence=detection_confidence,
-        min_tracking_confidence=tracking_confidence,
-        max_num_faces=max_faces,
-    )
-    st.session_state[cache_key] = face_detection_model_gal
+face_detector = FaceDetection()
+face_recognizer = FaceRecognition()
 
 stats_queue: "queue.Queue[Stats]" = queue.Queue()
 detections_queue: "queue.Queue[List[Detection]]" = queue.Queue()
@@ -154,23 +92,13 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     if face_rec_on:
         # Run face detection
         start = time.time()
-        detections = detect_faces(frame, face_detection_model)
+        frame, detections = face_detector(frame)
         stats = stats._replace(num_faces=len(detections) if detections else 0)
         stats = stats._replace(detection=(time.time() - start) * 1000)
 
-        # Run face alignment
-        start = time.time()
-        detections = align_faces(frame, detections)
-        stats = stats._replace(alignment=(time.time() - start) * 1000)
-
-        # Run inference
-        start = time.time()
-        detections = inference(detections, face_recognition_model)
-        stats = stats._replace(inference=(time.time() - start) * 1000)
-
         # Run face recognition
         start = time.time()
-        detections = recognize_faces(detections, gallery, similarity_threshold)
+        frame, identities = face_recognizer(frame, detections)
         stats = stats._replace(recognition=(time.time() - start) * 1000)
 
         # Draw detections
