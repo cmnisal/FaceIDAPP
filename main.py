@@ -3,18 +3,19 @@ import time
 from typing import List
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import logging
-import mediapipe as mp
-import tflite_runtime.interpreter as tflite
 import av
 import numpy as np
+import os
+import cv2
 import queue
 from streamlit_toggle import st_toggle_switch
 import pandas as pd
-from tools.nametypes import Stats, Detection
-from pathlib import Path
-from tools.utils import get_ice_servers, display_match, rgb, format_dflist
+from tools.nametypes import Stats, Detection, Identity, Match
+from tools.utils import get_ice_servers, rgb, format_dflist
 from tools.face_detection import FaceDetection
 from tools.face_recognition import FaceRecognition
+from tools.annotation import Annotation
+from tools.gallery import init_gallery
 
 
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
@@ -50,13 +51,16 @@ with st.sidebar:
     )
 
     st.markdown("## Face Detection")
-    max_faces = st.number_input("Maximum Number of Faces", value=2, min_value=1)
+    detection_min_face_size = st.slider(
+        "Min Face Size", min_value=5, max_value=120, value=40
+    )
+    detection_scale_factor = st.slider(
+        "Scale Factor", min_value=0.1, max_value=1.0, value=0.7
+    )
     detection_confidence = st.slider(
-        "Min Detection Confidence", min_value=0.0, max_value=1.0, value=0.5
+        "Min Detection Confidence", min_value=0.5, max_value=1.0, value=0.9
     )
-    tracking_confidence = st.slider(
-        "Min Tracking Confidence", min_value=0.0, max_value=1.0, value=0.9
-    )
+
     st.markdown("## Face Recognition")
     similarity_threshold = st.slider(
         "Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67
@@ -65,11 +69,29 @@ with st.sidebar:
         "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
     )
 
-face_detector = FaceDetection()
-face_recognizer = FaceRecognition()
+    st.markdown("**Gallery**")
+    files = st.sidebar.file_uploader(
+        "Upload images to gallery",
+        type=["png", "jpg", "jpeg"],
+        accept_multiple_files=True,
+    )
+
+gallery = init_gallery(
+    files, min_detections_conf=detection_confidence, min_similarity=similarity_threshold
+)
+
+face_detector = FaceDetection(
+    min_detections_conf=detection_confidence,
+    min_face_size=detection_min_face_size,
+    scale_factor=detection_scale_factor,
+)
+face_recognizer = FaceRecognition(min_similarity=similarity_threshold)
+annotator = Annotation()
 
 stats_queue: "queue.Queue[Stats]" = queue.Queue()
 detections_queue: "queue.Queue[List[Detection]]" = queue.Queue()
+identities_queue: "queue.Queue[List[Identity]]" = queue.Queue()
+matches_queue: "queue.Queue[List[Match]]" = queue.Queue()
 
 
 def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
@@ -98,13 +120,18 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
         # Run face recognition
         start = time.time()
-        frame, identities = face_recognizer(frame, detections)
+        identities = face_recognizer(frame, detections)
         stats = stats._replace(recognition=(time.time() - start) * 1000)
 
-        # Draw detections
+        # Do matching
         start = time.time()
-        frame = draw_detections(frame, detections)
-        stats = stats._replace(drawing=(time.time() - start) * 1000)
+        matches = face_recognizer.find_matches(identities, gallery)
+        stats = stats._replace(matching=(time.time() - start) * 1000)
+
+        # Draw annotations
+        start = time.time()
+        frame = annotator(frame, detections, identities, matches)
+        stats = stats._replace(annotation=(time.time() - start) * 1000)
 
     # Convert frame back to av.VideoFrame
     frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
@@ -114,6 +141,8 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
     # Send data to other thread
     detections_queue.put_nowait(detections)
+    identities_queue.put_nowait(identities)
+    matches_queue.put_nowait(matches)
     stats_queue.put_nowait(stats)
 
     return frame
@@ -122,21 +151,8 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 # Streamlit app
 st.title("FaceID App Demonstration")
 
-st.sidebar.markdown("**Gallery**")
-gallery = st.sidebar.file_uploader(
-    "Upload images to gallery", type=["png", "jpg", "jpeg"], accept_multiple_files=True
-)
-if gallery:
-    gallery = process_gallery(gallery, face_detection_model_gal, face_recognition_model_gal)
-    st.sidebar.markdown("**Gallery Images**")
-    st.sidebar.image(
-        [identity.image for identity in gallery],
-        caption=[identity.name for identity in gallery],
-        width=112,
-    )
-
 st.markdown("**Stats**")
-stats = st.empty()
+disp_stats = st.empty()
 
 ctx = webrtc_streamer(
     key="FaceIDAppDemo",
@@ -161,44 +177,77 @@ ctx = webrtc_streamer(
     async_processing=True,
 )
 
-st.markdown("**Identified Faces**")
-identified_faces = st.empty()
-
+# Display Detections and Identities
 st.markdown("**Detections**")
-detections = st.empty()
+disp_detections = st.empty()
+
+# Display Gallery and Detection Identities
+col_identities_gal, col_identities_det = st.columns(2)
+col_identities_gal.markdown("**Gallery Identities**")
+disp_identities_gal = col_identities_gal.empty()
+col_identities_det.markdown("**Detection Identities**")
+disp_identities_det = col_identities_det.empty()
+
+# Diplay Matched Faces Metrics
+col_matches, col_match_metrics = st.columns(2)
+col_matches.markdown("**Matches**")
+disp_matches = col_matches.empty()
+col_match_metrics.markdown("**Match Metrics**")
+disp_match_metrics = col_match_metrics.empty()
 
 # Display Live Stats
 if ctx.state.playing:
     while True:
-        # Get stats
+        # Get stats, format and display
         stats_data = stats_queue.get()
         stats_dataframe = pd.DataFrame([stats_data])
         stats_dataframe.style.format(thousands=" ", precision=2)
+        disp_stats.dataframe(stats_dataframe)
 
-        # Write stats to streamlit
-        stats.dataframe(stats_dataframe)
-
-        # Get detections
+        # Get detections, format and display
         detections_data = detections_queue.get()
-        detections_dataframe = (
-            pd.DataFrame(detections_data)
-            .drop(columns=["face", "face_match"], errors="ignore")
-            .applymap(lambda x: (format_dflist(x)))
+        detections_dataframe = pd.DataFrame(detections_data).applymap(
+            lambda x: (format_dflist(x))
         )
+        disp_detections.dataframe(detections_dataframe)
 
-        # Write detections to streamlit
-        detections.dataframe(detections_dataframe)
-
-        # Write identified faces to streamlit
-        identified_faces.image(
-            [display_match(d) for d in detections_data if d.name is not None],
-            caption=[
-                d.name + f"({d.distance:2f})"
-                for d in detections_data
-                if d.name is not None
+        # Display gallery identities
+        disp_identities_gal.image(
+            image=[
+                np.concatenate([identity.face, identity.face_aligned], axis=0)
+                for identity in gallery
             ],
-            width=112,
+            caption=[identity.name for identity in gallery],
         )
 
+        # Display detection identities
+        identities_data = identities_queue.get()
+        disp_identities_det.image(
+            image=[
+                np.concatenate([identity.face, identity.face_aligned], axis=0)
+                for identity in identities_data
+            ],
+        )
 
-# TODO: Issue with detected Face in "Identified Faces Display" Face is lagging, but Distance is updating? WTF?
+        # Display matches
+        matches_data = matches_queue.get()
+        disp_matches.image(
+            image=[match.faces for match in matches_data],
+            caption=[match.name for match in matches_data],
+        )
+
+        # Display match metrics
+        match_metrics_dataframe = pd.DataFrame(
+            [
+                {
+                    "Distance": match.distance,
+                    "Name": match.name,
+                    "Embedding Gallery": match.embedding_gal,
+                    "Embedding Detection": match.embedding_det,
+                }
+                for match in matches_data
+            ]
+        )
+        disp_match_metrics.dataframe(match_metrics_dataframe)
+
+# TODO Why is Distance so low?

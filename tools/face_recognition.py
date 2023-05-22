@@ -1,5 +1,5 @@
 from .utils import tflite_inference
-from .nametypes import Identity
+from .nametypes import Identity, Match
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
 import os
@@ -7,7 +7,7 @@ import cv2
 from skimage.transform import SimilarityTransform
 from .utils import get_file
 import tflite_runtime.interpreter as tflite
-from typing import Literal
+from typing import Literal, List
 
 
 BASE_URL = "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/"
@@ -21,61 +21,86 @@ FILE_HASHES = {
 class FaceRecognition:
     def __init__(
         self,
-        thresh: float = 0.67,
-        gallery_files: list = None,
+        min_similarity: float = 0.67,
         model_name: Literal["mobileNet", "resNet50"] = "mobileNet",
     ):
-        self.gallery = None
-        self.thresh = thresh
-        self.gallery = self._initialize_gallery(gallery_files)
-
+        self.min_similarity = min_similarity
         self.model = tflite.Interpreter(
             model_path=get_file(
                 BASE_URL + f"{model_name}.tflite", FILE_HASHES[model_name]
             )
         )
 
-    def _initialize_gallery(self, files):
-        if files is None:
+    def __call__(self, frame, detections):
+        # Align Faces
+        faces, faces_aligned = [], []
+        for detection in detections:
+            face = frame[
+                int(detection.bbox[0][1]) : int(detection.bbox[1][1]),
+                int(detection.bbox[0][0]) : int(detection.bbox[1][0]),
+            ]
+            try:
+                face = cv2.resize(face, (112, 112))
+            except:
+                face = np.zeros((112, 112, 3))
+
+            faces.append(face)
+            faces_aligned.append(self.align(frame, detection.landmarks))
+
+        # Do Inference
+        if len(faces_aligned) == 0:
+            return []
+        embs_det = tflite_inference(self.model, faces_aligned)
+        embs_det = np.asarray(embs_det[0])
+
+        # Save Identities
+        identities = []
+        for idx, detection in enumerate(detections):
+            identities.append(
+                Identity(
+                    detection_idx=detection.idx,
+                    embedding=embs_det[idx],
+                    face=faces[idx],
+                    face_aligned=faces_aligned[idx],
+                )
+            )
+        return identities
+        
+
+    def find_matches(self, identities, gallery):
+        if len(gallery) == 0 or len(identities) == 0:
             return []
 
-        # TODO
-        gallery = []
+        # Get Embeddings
+        embs_gal = np.asarray([identity.embedding for identity in gallery])
+        embs_det = np.asarray([identity.embedding for identity in identities])
 
-        return gallery
-
-    def __call__(self, frame, detections):
-        if len(detections) == 0 or len(self.gallery) == 0:
-            return frame, []
-
-        # Get Gallery Embeddings
-        embs_gal = np.asarray([identity.embedding for identity in self.gallery])
-
-        # Get Detections Embeddings
-        faces_aligned = [self.align(detection.face) for detection in detections]
-        embs_det = tflite_inference(faces_aligned)
-
-        # Get Cosine Distances
+        # Calculate Cosine Distances
         cos_distances = cosine_distances(embs_det, embs_gal)
 
-        # Get Matching Identities
-        identities = []
-        for det_idx in range(len(detections)):
-            idx_min = np.argmin(cos_distances[det_idx])
-            if cos_distances[det_idx][idx_min] < self.thresh:
-                identities.append(
-                    Identity(
-                        name=os.path.splittext(self.gallery[idx_min])[0],
-                        embedding_match=self.gallery[idx_min].embedding,
-                        face_match=self.gallery[idx_min].image,
-                        dist=cos_distances[det_idx][idx_min],
+        # Find Matches
+        matches = []
+        for ident_idx, identity in enumerate(identities):
+            dist_to_identity = cos_distances[ident_idx]
+            print(dist_to_identity)
+            idx_min = np.argmin(dist_to_identity)
+            if dist_to_identity[idx_min] < self.min_similarity:
+                matches.append(
+                    Match(
+                        identity_idx=identity.detection_idx,
+                        faces_aligned=np.concatenate([identity.face_aligned, gallery[idx_min].face_aligned], axis=1),
+                        faces=np.concatenate([identity.face, gallery[idx_min].face], axis=1),
+                        name=gallery[idx_min].name,
+                        distance=dist_to_identity[idx_min],
+                        embedding_gal=gallery[idx_min].embedding,
+                        embedding_det=identity.embedding,
                     )
                 )
 
-        return frame, identities
+        return matches
 
     @staticmethod
-    def align(face, landmarks_source, target_size=(112, 112)):
+    def align(img, landmarks_source, target_size=(112, 112)):
         landmarks_target = np.array(
             [
                 [38.2946, 51.6963],
@@ -89,5 +114,5 @@ class FaceRecognition:
         tform = SimilarityTransform()
         tform.estimate(landmarks_source, landmarks_target)
         tmatrix = tform.params[0:2, :]
-        face_aligned = cv2.warpAffine(face, tmatrix, target_size, borderValue=0.0)
+        face_aligned = cv2.warpAffine(img, tmatrix, target_size, borderValue=0.0)
         return face_aligned

@@ -3,14 +3,18 @@ import numpy as np
 
 
 class Detection(NamedTuple):
-    bbox: List[int]
-    landmarks: List[List[int]]
+    idx: int = None
+    bbox: List[List[float]] = None
+    landmarks: List[List[float]] = None
+    confidence: float = None
+    
+
+class Identity(NamedTuple):
+    detection_idx: int = None
     name: str = None
-    face: np.ndarray = None
     embedding: np.ndarray = None
-    embedding_match: np.ndarray = None
-    face_match: np.ndarray = None
-    distance: float = None
+    face_aligned: np.ndarray = None
+    face: np.ndarray = None
 
 
 class Stats(NamedTuple):
@@ -18,13 +22,16 @@ class Stats(NamedTuple):
     resolution: List[int] = [None, None, None]
     num_faces: int = 0
     detection: float = None
-    alignment: float = None
-    inference: float = None
     recognition: float = None
-    drawing: float = None
+    matching: float = None
+    annotation: float = None
     
 
-class Identity(NamedTuple):
-    name: str
-    embedding: np.ndarray
-    image: np.ndarray
+class Match(NamedTuple):
+    identity_idx: int = None
+    faces_aligned: np.ndarray = None
+    faces: np.ndarray = None
+    distance: float = None
+    name: str = None
+    embedding_gal: np.ndarray = None
+    embedding_det: np.ndarray = None

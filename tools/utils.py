@@ -164,21 +164,6 @@ def format_dflist(val):
         return val
 
 
-def display_match(d):
-    im = np.concatenate([d.face, d.face_match])
-    border_size = 2
-    border = cv2.copyMakeBorder(
-        im,
-        top=border_size,
-        bottom=border_size,
-        left=border_size,
-        right=border_size,
-        borderType=cv2.BORDER_CONSTANT,
-        value=(255, 255, 120),
-    )
-    return border
-
-
 def rgb(r, g, b):
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
@@ -189,6 +174,15 @@ def tflite_inference(model, img):
     :param img: image
     :return: list of outputs of the model
     """
+
+    # Check if img is np.ndarray
+    if not isinstance(img, np.ndarray):
+        img = np.asarray(img)
+    
+    # Check if dim is 4
+    if len(img.shape) == 3:
+        img = np.expand_dims(img, axis=0)
+
     input_details = model.get_input_details()
     output_details = model.get_output_details()
     model.resize_tensor_input(input_details[0]["index"], img.shape)
