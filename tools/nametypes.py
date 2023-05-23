@@ -7,7 +7,7 @@ class Detection(NamedTuple):
     bbox: List[List[float]] = None
     landmarks: List[List[float]] = None
     confidence: float = None
-    
+
 
 class Identity(NamedTuple):
     detection_idx: int = None
@@ -24,7 +24,7 @@ class Stats(NamedTuple):
     recognition: float = None
     matching: float = None
     annotation: float = None
-    
+
 
 class Match(NamedTuple):
     identity_idx: int = None

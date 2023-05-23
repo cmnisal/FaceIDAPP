@@ -13,7 +13,7 @@ class Annotation:
         shape = np.asarray(frame.shape[:2][::-1])
         if self.upscale:
             frame = cv2.resize(frame, (1920, 1080))
-            upscale_factor = np.asarray([1920 / shape[0] , 1080 / shape[1]])
+            upscale_factor = np.asarray([1920 / shape[0], 1080 / shape[1]])
             shape = np.asarray(frame.shape[:2][::-1])
         else:
             upscale_factor = np.asarray([1, 1])
@@ -56,7 +56,6 @@ class Annotation:
                 2,
             )
 
-        
         # Draw Name
         if self.name:
             for match in matches:
@@ -67,7 +66,7 @@ class Annotation:
                     print("Len(Detections): ", len(detections))
                     print("Len(Identites): ", len(identities))
                     print("Detection IDX: ", identities[match.identity_idx].detection_idx)
-                    
+
                     # print("Detections: ", detections)
 
                 cv2.rectangle(

@@ -23,13 +23,7 @@ class StageStatus:
     def __init__(self, pad_result: tuple = None, width=0, height=0):
         self.width = width
         self.height = height
-        self.dy = (
-            self.edy
-        ) = (
-            self.dx
-        ) = (
-            self.edx
-        ) = self.y = self.ey = self.x = self.ex = self.tmp_w = self.tmp_h = []
+        self.dy = self.edy = self.dx = self.edx = self.y = self.ey = self.x = self.ex = self.tmp_w = self.tmp_h = []
 
         if pad_result is not None:
             self.update(pad_result)
@@ -65,15 +59,9 @@ class FaceDetection:
         self._steps_threshold = steps_threshold
         self._scale_factor = scale_factor
         self.min_detections_conf = min_detections_conf
-        self.p_net = tflite.Interpreter(
-            model_path=get_file(BASE_URL + "p_net.tflite", FILE_HASHES["p_net"])
-        )
-        self.r_net = tflite.Interpreter(
-            model_path=get_file(BASE_URL + "r_net.tflite", FILE_HASHES["r_net"])
-        )
-        self.o_net = tflite.Interpreter(
-            model_path=get_file(BASE_URL + "o_net.tflite", FILE_HASHES["o_net"])
-        )
+        self.p_net = tflite.Interpreter(model_path=get_file(BASE_URL + "p_net.tflite", FILE_HASHES["p_net"]))
+        self.r_net = tflite.Interpreter(model_path=get_file(BASE_URL + "r_net.tflite", FILE_HASHES["r_net"]))
+        self.o_net = tflite.Interpreter(model_path=get_file(BASE_URL + "o_net.tflite", FILE_HASHES["o_net"]))
 
     def __call__(self, frame):
         """
@@ -150,9 +138,7 @@ class FaceDetection:
         width_scaled = int(np.ceil(width * scale))
         height_scaled = int(np.ceil(height * scale))
 
-        im_data = cv2.resize(
-            image, (width_scaled, height_scaled), interpolation=cv2.INTER_AREA
-        )
+        im_data = cv2.resize(image, (width_scaled, height_scaled), interpolation=cv2.INTER_AREA)
 
         # Normalize the image's pixels
         im_data_normalized = (im_data - 127.5) * 0.0078125
@@ -180,9 +166,7 @@ class FaceDetection:
             dy2 = np.flipud(dy2)
 
         score = imap[(y, x)]
-        reg = np.transpose(
-            np.vstack([dx1[(y, x)], dy1[(y, x)], dx2[(y, x)], dy2[(y, x)]])
-        )
+        reg = np.transpose(np.vstack([dx1[(y, x)], dy1[(y, x)], dx2[(y, x)], dy2[(y, x)]]))
 
         if reg.size == 0:
             reg = np.empty(shape=(0, 3))
@@ -356,9 +340,7 @@ class FaceDetection:
             qq3 = total_boxes[:, 2] + total_boxes[:, 7] * regw
             qq4 = total_boxes[:, 3] + total_boxes[:, 8] * regh
 
-            total_boxes = np.transpose(
-                np.vstack([qq1, qq2, qq3, qq4, total_boxes[:, 4]])
-            )
+            total_boxes = np.transpose(np.vstack([qq1, qq2, qq3, qq4, total_boxes[:, 4]]))
             total_boxes = self.__rerec(total_boxes.copy())
 
             total_boxes[:, 0:4] = np.fix(total_boxes[:, 0:4]).astype(np.int32)
@@ -399,15 +381,8 @@ class FaceDetection:
                 :,
             ]
 
-            if (
-                tmp.shape[0] > 0
-                and tmp.shape[1] > 0
-                or tmp.shape[0] == 0
-                and tmp.shape[1] == 0
-            ):
-                tempimg[:, :, :, k] = cv2.resize(
-                    tmp, (24, 24), interpolation=cv2.INTER_AREA
-                )
+            if tmp.shape[0] > 0 and tmp.shape[1] > 0 or tmp.shape[0] == 0 and tmp.shape[1] == 0:
+                tempimg[:, :, :, k] = cv2.resize(tmp, (24, 24), interpolation=cv2.INTER_AREA)
 
             else:
                 return np.empty(shape=(0,)), stage_status
@@ -424,9 +399,7 @@ class FaceDetection:
 
         ipass = np.where(score > self._steps_threshold[1])
 
-        total_boxes = np.hstack(
-            [total_boxes[ipass[0], 0:4].copy(), np.expand_dims(score[ipass].copy(), 1)]
-        )
+        total_boxes = np.hstack([total_boxes[ipass[0], 0:4].copy(), np.expand_dims(score[ipass].copy(), 1)])
 
         mv = out0[:, ipass[0]]
 
@@ -464,19 +437,12 @@ class FaceDetection:
         for k in range(0, num_boxes):
             tmp = np.zeros((int(status.tmp_h[k]), int(status.tmp_w[k]), 3))
 
-            tmp[
-                status.dy[k] - 1 : status.edy[k], status.dx[k] - 1 : status.edx[k], :
-            ] = img[status.y[k] - 1 : status.ey[k], status.x[k] - 1 : status.ex[k], :]
+            tmp[status.dy[k] - 1 : status.edy[k], status.dx[k] - 1 : status.edx[k], :] = img[
+                status.y[k] - 1 : status.ey[k], status.x[k] - 1 : status.ex[k], :
+            ]
 
-            if (
-                tmp.shape[0] > 0
-                and tmp.shape[1] > 0
-                or tmp.shape[0] == 0
-                and tmp.shape[1] == 0
-            ):
-                tempimg[:, :, :, k] = cv2.resize(
-                    tmp, (48, 48), interpolation=cv2.INTER_AREA
-                )
+            if tmp.shape[0] > 0 and tmp.shape[1] > 0 or tmp.shape[0] == 0 and tmp.shape[1] == 0:
+                tempimg[:, :, :, k] = cv2.resize(tmp, (48, 48), interpolation=cv2.INTER_AREA)
             else:
                 return np.empty(shape=(0,)), np.empty(shape=(0,))
 
@@ -496,23 +462,15 @@ class FaceDetection:
 
         points = points[:, ipass[0]]
 
-        total_boxes = np.hstack(
-            [total_boxes[ipass[0], 0:4].copy(), np.expand_dims(score[ipass].copy(), 1)]
-        )
+        total_boxes = np.hstack([total_boxes[ipass[0], 0:4].copy(), np.expand_dims(score[ipass].copy(), 1)])
 
         mv = out0[:, ipass[0]]
 
         w = total_boxes[:, 2] - total_boxes[:, 0] + 1
         h = total_boxes[:, 3] - total_boxes[:, 1] + 1
 
-        points[0:5, :] = (
-            np.tile(w, (5, 1)) * points[0:5, :] + np.tile(total_boxes[:, 0], (5, 1)) - 1
-        )
-        points[5:10, :] = (
-            np.tile(h, (5, 1)) * points[5:10, :]
-            + np.tile(total_boxes[:, 1], (5, 1))
-            - 1
-        )
+        points[0:5, :] = np.tile(w, (5, 1)) * points[0:5, :] + np.tile(total_boxes[:, 0], (5, 1)) - 1
+        points[5:10, :] = np.tile(h, (5, 1)) * points[5:10, :] + np.tile(total_boxes[:, 1], (5, 1)) - 1
 
         if total_boxes.shape[0] > 0:
             total_boxes = self.__bbreg(total_boxes.copy(), np.transpose(mv))

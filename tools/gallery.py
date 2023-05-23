@@ -13,9 +13,7 @@ def init_gallery(files, min_detections_conf=0.8, min_similarity=0.67, model_name
     gallery = []
     for file in files:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
-        img = cv2.cvtColor(
-            cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB
-        )
+        img = cv2.cvtColor(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
         # Face Detection
         img, detections = face_detector(img)
 

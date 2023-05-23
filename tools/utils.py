@@ -28,9 +28,7 @@ def get_ice_servers(name="twilio"):
             account_sid = os.environ["TWILIO_ACCOUNT_SID"]
             auth_token = os.environ["TWILIO_AUTH_TOKEN"]
         except KeyError:
-            logger.warning(
-                "Twilio credentials are not set. Fallback to a free STUN server from Google."
-            )
+            logger.warning("Twilio credentials are not set. Fallback to a free STUN server from Google.")
             return [{"urls": ["stun:stun.l.google.com:19302"]}]
 
         client = Client(account_sid, auth_token)
@@ -44,9 +42,7 @@ def get_ice_servers(name="twilio"):
             username = os.environ["METERED_USERNAME"]
             credential = os.environ["METERED_CREDENTIAL"]
         except KeyError:
-            logger.warning(
-                "Metered credentials are not set. Fallback to a free STUN server from Google."
-            )
+            logger.warning("Metered credentials are not set. Fallback to a free STUN server from Google.")
             return [{"urls": ["stun:stun.l.google.com:19302"]}]
 
         ice_servers = [
@@ -108,7 +104,7 @@ def tflite_inference(model, img):
     # Check if img is np.ndarray
     if not isinstance(img, np.ndarray):
         img = np.asarray(img)
-    
+
     # Check if dim is 4
     if len(img.shape) == 3:
         img = np.expand_dims(img, axis=0)

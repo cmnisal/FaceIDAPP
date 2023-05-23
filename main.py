@@ -22,9 +22,7 @@ logging.basicConfig(level=logging.ERROR)
 
 
 # Set page layout for streamlit to wide
-st.set_page_config(
-    layout="wide", page_title="FaceID App Demo", page_icon=":sunglasses:"
-)
+st.set_page_config(layout="wide", page_title="FaceID App Demo", page_icon=":sunglasses:")
 with st.sidebar:
     st.markdown("# Settings")
     face_rec_on = st_toggle_switch(
@@ -51,20 +49,12 @@ with st.sidebar:
         )
         st.markdown("---")
         st.markdown("## Face Detection")
-        detection_min_face_size = st.slider(
-            "Min Face Size", min_value=5, max_value=120, value=40
-        )
-        detection_scale_factor = st.slider(
-            "Scale Factor", min_value=0.1, max_value=1.0, value=0.7
-        )
-        detection_confidence = st.slider(
-            "Min Detection Confidence", min_value=0.5, max_value=1.0, value=0.9
-        )
+        detection_min_face_size = st.slider("Min Face Size", min_value=5, max_value=120, value=40)
+        detection_scale_factor = st.slider("Scale Factor", min_value=0.1, max_value=1.0, value=0.7)
+        detection_confidence = st.slider("Min Detection Confidence", min_value=0.5, max_value=1.0, value=0.9)
         st.markdown("---")
         st.markdown("## Face Recognition")
-        similarity_threshold = st.slider(
-            "Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67
-        )
+        similarity_threshold = st.slider("Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67)
         st.markdown(
             "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
         )
@@ -89,7 +79,10 @@ with st.sidebar:
 
 
 gallery = init_gallery(
-    files, min_detections_conf=detection_confidence, min_similarity=similarity_threshold, model_name=model_name
+    files,
+    min_detections_conf=detection_confidence,
+    min_similarity=similarity_threshold,
+    model_name=model_name,
 )
 
 face_detector = FaceDetection(
@@ -101,6 +94,7 @@ face_recognizer = FaceRecognition(model_name=model_name, min_similarity=similari
 annotator = Annotation()
 
 transfer_queue: "queue.Queue[Stats, List[Detection], List[Identity], List[Match]]" = queue.Queue()
+
 
 def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     # Initialize detections
@@ -182,9 +176,7 @@ ctx = webrtc_streamer(
     async_processing=True,
 )
 
-tab_recognition, tab_metrics, tab_pca = st.tabs(
-    ["Recognized Identities", "Recognition Metrics", "Live PCAs"]
-)
+tab_recognition, tab_metrics, tab_pca = st.tabs(["Recognized Identities", "Recognition Metrics", "Live PCAs"])
 
 
 with tab_recognition:
@@ -217,8 +209,24 @@ with tab_pca:
     if freeze_pcas and gallery:
         col1, col2 = st.columns(2)
         if len(st.session_state.matches) > 1:
-            col1.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=3), use_container_width=True)
-            col2.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=2), use_container_width=True)
+            col1.plotly_chart(
+                pca(
+                    st.session_state.matches,
+                    st.session_state.identities,
+                    gallery,
+                    dim=3,
+                ),
+                use_container_width=True,
+            )
+            col2.plotly_chart(
+                pca(
+                    st.session_state.matches,
+                    st.session_state.identities,
+                    gallery,
+                    dim=2,
+                ),
+                use_container_width=True,
+            )
 
 
 # Show Gallery Identities
@@ -275,9 +283,7 @@ if ctx.state.playing:
         # Show Recognized Identities
         if matches:
             disp_identities_rec.image(
-                image=[
-                    identities[match.identity_idx].face_aligned for match in matches
-                ],
+                image=[identities[match.identity_idx].face_aligned for match in matches],
                 caption=[gallery[match.gallery_idx].name for match in matches],
             )
         else:

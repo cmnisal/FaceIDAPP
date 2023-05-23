@@ -19,9 +19,7 @@ def detect_faces(frame, model):
 
             FIVE_LANDMARKS = [470, 475, 1, 57, 287]
 
-            landmarks = [
-                [face.landmark[i].x, face.landmark[i].y] for i in FIVE_LANDMARKS
-            ]
+            landmarks = [[face.landmark[i].x, face.landmark[i].y] for i in FIVE_LANDMARKS]
 
             detections.append(Detection(bbox=bbox, landmarks=landmarks))
     return detections
@@ -57,9 +55,7 @@ def align(img, landmarks, target_size=(112, 112)):
 def align_faces(img, detections):
     updated_detections = []
     for detection in detections:
-        updated_detections.append(
-            detection._replace(face=align(img, detection.landmarks))
-        )
+        updated_detections.append(detection._replace(face=align(img, detection.landmarks)))
     return updated_detections
 
 
@@ -73,9 +69,7 @@ def inference(detections, model):
         model.allocate_tensors()
         model.set_tensor(model.get_input_details()[0]["index"], faces)
         model.invoke()
-        embs = [model.get_tensor(elem["index"]) for elem in model.get_output_details()][
-            0
-        ]
+        embs = [model.get_tensor(elem["index"]) for elem in model.get_output_details()][0]
 
         for idx, detection in enumerate(detections):
             updated_detections.append(detection._replace(embedding=embs[idx]))
@@ -102,10 +96,7 @@ def recognize_faces(detections, gallery, thresh=0.67):
             pred = idx_min
         updated_detections.append(
             detection._replace(
-                name=gallery[pred]
-                .name.split(".jpg")[0]
-                .split(".png")[0]
-                .split(".jpeg")[0]
+                name=gallery[pred].name.split(".jpg")[0].split(".png")[0].split(".jpeg")[0]
                 if pred is not None
                 else None,
                 embedding_match=gallery[pred].embedding if pred is not None else None,
@@ -121,9 +112,7 @@ def process_gallery(files, face_detection_model, face_recognition_model):
     gallery = []
     for file in files:
         file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
-        img = cv2.cvtColor(
-            cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB
-        )
+        img = cv2.cvtColor(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
 
         detections = detect_faces(img, face_detection_model)
 
@@ -148,7 +137,11 @@ def process_gallery(files, face_detection_model, face_recognition_model):
 
 
 def draw_detections(
-    frame, detections, bbox=True, landmarks=True, name=True,
+    frame,
+    detections,
+    bbox=True,
+    landmarks=True,
+    name=True,
 ):
     shape = np.asarray(frame.shape[:2][::-1])
 

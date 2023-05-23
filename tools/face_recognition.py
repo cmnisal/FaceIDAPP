@@ -24,11 +24,7 @@ class FaceRecognition:
         model_name: Literal["mobileNet", "resNet50"] = "mobileNet",
     ):
         self.min_similarity = min_similarity
-        self.model = tflite.Interpreter(
-            model_path=get_file(
-                BASE_URL + f"{model_name}.tflite", FILE_HASHES[model_name]
-            )
-        )
+        self.model = tflite.Interpreter(model_path=get_file(BASE_URL + f"{model_name}.tflite", FILE_HASHES[model_name]))
 
     def __call__(self, frame, detections):
         # Align Faces
@@ -49,7 +45,7 @@ class FaceRecognition:
         # Do Inference
         if len(faces_aligned) == 0:
             return []
-        
+
         # Normalize images from [0, 255] to [0, 1]
         faces_aligned_norm = np.asarray(faces_aligned).astype(np.float32) / 255.0
 
@@ -67,7 +63,6 @@ class FaceRecognition:
                 )
             )
         return identities
-        
 
     def find_matches(self, identities, gallery):
         if len(gallery) == 0 or len(identities) == 0:
@@ -94,7 +89,7 @@ class FaceRecognition:
                         name=gallery[idx_min].name,
                     )
                 )
-        
+
         # Sort Matches by identity_idx
         matches = sorted(matches, key=lambda match: match.gallery_idx)
 
