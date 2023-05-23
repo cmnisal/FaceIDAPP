@@ -1,15 +1,10 @@
 import logging
 import os
-import urllib.request
-from pathlib import Path
 import streamlit as st
 from twilio.rest import Client
 import os
-import cv2
 import numpy as np
 import hashlib
-from collections import deque
-import cv2 as cv
 import tempfile
 import os
 import hashlib
@@ -86,70 +81,6 @@ def get_ice_servers(name="twilio"):
         raise ValueError(f"Unknown name: {name}")
 
 
-def get_hash(filepath):
-    hasher = hashlib.sha256()
-    with open(filepath, "rb") as file:
-        for chunk in iter(lambda: file.read(65535), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-
-def download_file(url, model_path: Path, file_hash=None):
-    if model_path.exists():
-        if file_hash:
-            hasher = hashlib.sha256()
-            with open(model_path, "rb") as file:
-                for chunk in iter(lambda: file.read(65535), b""):
-                    hasher.update(chunk)
-            if not hasher.hexdigest() == file_hash:
-                print(
-                    "A local file was found, but it seems to be incomplete or outdated because the file hash does not "
-                    "match the original value of "
-                    + file_hash
-                    + " so data will be downloaded."
-                )
-                download = True
-            else:
-                print("Using a verified local file.")
-                download = False
-    else:
-        model_path.mkdir(parents=True, exist_ok=True)
-        print("Downloading data ...")
-        download = True
-
-    if download:
-        # These are handles to two visual elements to animate.
-        weights_warning, progress_bar = None, None
-        try:
-            weights_warning = st.warning("Downloading %s..." % url)
-            progress_bar = st.progress(0)
-            with open(model_path, "wb") as output_file:
-                with urllib.request.urlopen(url) as response:
-                    length = int(response.info()["Content-Length"])
-                    counter = 0.0
-                    MEGABYTES = 2.0**20.0
-                    while True:
-                        data = response.read(8192)
-                        if not data:
-                            break
-                        counter += len(data)
-                        output_file.write(data)
-
-                        # We perform animation by overwriting the elements.
-                        weights_warning.warning(
-                            "Downloading %s... (%6.2f/%6.2f MB)"
-                            % (url, counter / MEGABYTES, length / MEGABYTES)
-                        )
-                        progress_bar.progress(min(counter / length, 1.0))
-
-        # Finally, we remove these visual elements by calling .empty().
-        finally:
-            if weights_warning is not None:
-                weights_warning.empty()
-            if progress_bar is not None:
-                progress_bar.empty()
-
-
 # Function to format floats within a list
 def format_dflist(val):
     if isinstance(val, list):
@@ -174,7 +105,6 @@ def tflite_inference(model, img):
     :param img: image
     :return: list of outputs of the model
     """
-
     # Check if img is np.ndarray
     if not isinstance(img, np.ndarray):
         img = np.asarray(img)

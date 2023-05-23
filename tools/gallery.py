@@ -16,7 +16,6 @@ def init_gallery(files, min_detections_conf=0.8, min_similarity=0.67):
         img = cv2.cvtColor(
             cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB
         )
-
         # Face Detection
         img, detections = face_detector(img)
 
@@ -33,7 +32,6 @@ def init_gallery(files, min_detections_conf=0.8, min_similarity=0.67):
             Identity(
                 name=os.path.splitext(file.name)[0],
                 embedding=identities[0].embedding,
-                face=identities[0].face,
                 face_aligned=identities[0].face_aligned,
             )
         )

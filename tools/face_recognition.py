@@ -2,12 +2,11 @@ from .utils import tflite_inference
 from .nametypes import Identity, Match
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
-import os
 import cv2
 from skimage.transform import SimilarityTransform
 from .utils import get_file
 import tflite_runtime.interpreter as tflite
-from typing import Literal, List
+from typing import Literal
 
 
 BASE_URL = "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/"
@@ -50,7 +49,11 @@ class FaceRecognition:
         # Do Inference
         if len(faces_aligned) == 0:
             return []
-        embs_det = tflite_inference(self.model, faces_aligned)
+        
+        # Normalize images from [0, 255] to [0, 1]
+        faces_aligned_norm = np.asarray(faces_aligned).astype(np.float32) / 255.0
+
+        embs_det = tflite_inference(self.model, faces_aligned_norm)
         embs_det = np.asarray(embs_det[0])
 
         # Save Identities
@@ -60,7 +63,6 @@ class FaceRecognition:
                 Identity(
                     detection_idx=detection.idx,
                     embedding=embs_det[idx],
-                    face=faces[idx],
                     face_aligned=faces_aligned[idx],
                 )
             )
@@ -82,14 +84,12 @@ class FaceRecognition:
         matches = []
         for ident_idx, identity in enumerate(identities):
             dist_to_identity = cos_distances[ident_idx]
-            print(dist_to_identity)
             idx_min = np.argmin(dist_to_identity)
             if dist_to_identity[idx_min] < self.min_similarity:
                 matches.append(
                     Match(
                         identity_idx=identity.detection_idx,
                         faces_aligned=np.concatenate([identity.face_aligned, gallery[idx_min].face_aligned], axis=1),
-                        faces=np.concatenate([identity.face, gallery[idx_min].face], axis=1),
                         name=gallery[idx_min].name,
                         distance=dist_to_identity[idx_min],
                         embedding_gal=gallery[idx_min].embedding,
