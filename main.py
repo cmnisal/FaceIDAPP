@@ -289,4 +289,4 @@ if ctx.state.playing:
         else:
             disp_identities_rec.info("No recognized identities yet ...")
 
-# BUG Recognized Identity Image is not updating on cloud version? (works on local)
+# BUG Recognized Identity Image is not updating on cloud version? (works on local!!!)

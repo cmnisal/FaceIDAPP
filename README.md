@@ -1,13 +1,5 @@
----
-title: LiveFaceID
-emoji: 🐢
-colorFrom: gray
-colorTo: pink
-sdk: streamlit
-sdk_version: 1.19.0
-app_file: app.py
-pinned: false
-license: mit
----
+# Live Webcam Face Recognition Demonstration
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+## BUGS:
+
+- [ ] In online demo, the identy preview is only showing the first frame of the video
