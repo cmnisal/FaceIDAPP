@@ -216,8 +216,9 @@ with tab_pca:
     # Show PCAs
     if freeze_pcas and gallery:
         col1, col2 = st.columns(2)
-        col1.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=3), use_container_width=True)
-        col2.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=2), use_container_width=True)
+        if len(st.session_state.matches) > 1:
+            col1.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=3), use_container_width=True)
+            col2.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=2), use_container_width=True)
 
 
 # Show Gallery Identities
