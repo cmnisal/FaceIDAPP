@@ -4,9 +4,6 @@ from typing import List
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import logging
 import av
-import numpy as np
-import os
-import cv2
 import queue
 from streamlit_toggle import st_toggle_switch
 import pandas as pd
@@ -16,7 +13,6 @@ from tools.face_detection import FaceDetection
 from tools.face_recognition import FaceRecognition
 from tools.annotation import Annotation
 from tools.gallery import init_gallery
-from st_aggrid import AgGrid
 
 
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
