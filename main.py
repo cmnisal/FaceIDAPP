@@ -45,7 +45,7 @@ with st.sidebar:
         )
         st.markdown("Note: To change the resolution, you have to restart the stream.")
 
-        ice_server = st.selectbox("ICE Server", ["twilio", "metered"], index=0)
+        ice_server = st.selectbox("ICE Server", ["twilio", "metered"], index=1)
         st.markdown(
             "Note: metered is a free server with limited bandwidth, and can take a while to connect. Twilio is a paid service and is payed by me, so please don't abuse it."
         )
