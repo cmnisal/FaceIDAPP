@@ -13,6 +13,7 @@ from tools.face_detection import FaceDetection
 from tools.face_recognition import FaceRecognition
 from tools.annotation import Annotation
 from tools.gallery import init_gallery
+from tools.pca import pca2d, pca3d
 
 
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
@@ -22,8 +23,7 @@ logging.basicConfig(level=logging.ERROR)
 
 # Set page layout for streamlit to wide
 st.set_page_config(
-    layout="wide", 
-    page_title="FaceID App Demo", page_icon=":sunglasses:"
+    layout="wide", page_title="FaceID App Demo", page_icon=":sunglasses:"
 )
 with st.sidebar:
     st.markdown("# Settings")
@@ -74,10 +74,14 @@ with st.sidebar:
         "Upload images to gallery",
         type=["png", "jpg", "jpeg"],
         accept_multiple_files=True,
+        label_visibility="collapsed",
     )
 
     with st.expander("Uploaded Images", expanded=True):
-        st.image(files, width=112, caption=files)
+        if files:
+            st.image(files, width=112, caption=files)
+        else:
+            st.info("No images uploaded yet.")
 
 
 gallery = init_gallery(
@@ -155,8 +159,8 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 # Streamlit app
 st.title("Live Webcam Face Recognition")
 
-st.markdown("**Stats**")
-disp_stats = st.empty()
+st.markdown("**Stream Stats**")
+disp_stats = st.info("No streaming statistics yet, please start the stream.")
 
 ctx = webrtc_streamer(
     key="FaceIDAppDemo",
@@ -181,75 +185,101 @@ ctx = webrtc_streamer(
     async_processing=True,
 )
 
-# Display Detections and Identities
-st.markdown("**Detections**")
-disp_detections = st.empty()
+tab_recognition, tab_metrics, tab_pca = st.tabs(
+    ["Recognized Identities", "Recognition Metrics", "Live PCAs"]
+)
 
-# Display Gallery and Detection Identities
-col_identities_gal, col_identities_det = st.columns(2)
-col_identities_gal.markdown("**Gallery Identities**")
-disp_identities_gal = col_identities_gal.empty()
-col_identities_det.markdown("**Detection Identities**")
-disp_identities_det = col_identities_det.empty()
 
-# Diplay Matched Faces Metrics
-col_matches, col_match_metrics = st.columns(2)
-col_matches.markdown("**Matches**")
-disp_matches = col_matches.empty()
-col_match_metrics.markdown("**Match Metrics**")
-disp_match_metrics = col_match_metrics.empty()
+with tab_recognition:
+    # Display Gallery and Recognized Identities
+    col_identities_gal, col_identities_rec = st.columns(2)
+    col_identities_gal.markdown("**Gallery Identities**")
+    disp_identities_gal = col_identities_gal.info("No gallery images")
+    col_identities_rec.markdown("**Recognized Identities**")
+    disp_identities_rec = col_identities_rec.info("No recognized identities")
 
-# Display gallery identities
-if gallery:
-    disp_identities_gal.image(
-        image=[identity.face_aligned for identity in gallery],
-        caption=[identity.name for identity in gallery],
-    )
-else:
-    disp_identities_gal.empty()
+with tab_metrics:
+    # Display Detections and Identities
+    st.markdown("**Detection Metrics**")
+    disp_detection_metrics = st.info("No detected faces")
+
+    # Display Recognition Metrics
+    st.markdown("**Recognition Metrics**")
+    disp_recognition_metrics = st.info("No recognized identities")
+
+with tab_pca:
+    # Display PCA2D
+    st.markdown("**PCA 2D**")
+    disp_pca2d = st.info("Only available if more than 1 recognized face")
+
+    # Display PCA3D
+    st.markdown("**PCA 3D**")
+    disp_pca3d = st.info("Only available if more than 1 recognized face")
+
+    # Display Matched Faces
+    st.markdown("**Matches**")
+    disp_matches = st.info("No recognized identities")
 
 # Display Live Stats
 if ctx.state.playing:
     while True:
-        # Get stats, format and displayw
-        stats_data = stats_queue.get()
-        stats_dataframe = pd.DataFrame([stats_data]).applymap(
-            lambda x: (format_dflist(x))
-        )
-        disp_stats.dataframe(stats_dataframe, use_container_width=True)
+        # Retrieve data from other thread
+        identities = identities_queue.get()
+        detections = detections_queue.get()
+        matches = matches_queue.get()
+        stats = stats_queue.get()
 
-        # Get detections, format and display
-        detections_data = detections_queue.get()
-        detections_dataframe = pd.DataFrame(detections_data).applymap(
-            lambda x: (format_dflist(x))
+        # Show Stats
+        disp_stats.dataframe(
+            pd.DataFrame([stats]).applymap(lambda x: (format_dflist(x))),
+            use_container_width=True,
         )
-        if detections_data:
-            disp_detections.dataframe(detections_dataframe, use_container_width=True)
-        else:
-            disp_detections.empty()
 
-        # Display detection identities
-        identities_data = identities_queue.get()
-        if identities_data:
-            disp_identities_det.image(
-                image=[identity.face_aligned for identity in identities_data]
+        # Show Detections Metrics
+        if detections:
+            disp_detection_metrics.dataframe(
+                pd.DataFrame(detections).applymap(lambda x: (format_dflist(x))),
+                use_container_width=True,
             )
         else:
-            disp_identities_det.empty()
+            disp_detection_metrics.info("No detected faces")
 
-        # Display matches and match metrics
-        matches_data = matches_queue.get()
-        if matches_data:
-            disp_matches.image(
-                image=[match.faces_aligned for match in matches_data],
-                caption=[match.name for match in matches_data],
-            )
-            match_metrics_dataframe = (
-                pd.DataFrame(matches_data)
+        # Show Match Metrics
+        if matches:
+            disp_recognition_metrics.dataframe(
+                pd.DataFrame(matches)
                 .drop(columns=["faces", "faces_aligned"])
-                .applymap(lambda x: (format_dflist(x)))
+                .applymap(lambda x: (format_dflist(x))),
+                use_container_width=True,
             )
-            disp_match_metrics.dataframe(match_metrics_dataframe, use_container_width=True)
         else:
-            disp_matches.empty()
-            disp_match_metrics.empty()
+            disp_recognition_metrics.info("No recognized identities")
+
+        # Show PCAs
+        if len(matches) > 1:
+            disp_pca3d.plotly_chart(pca3d(matches), use_container_width=True)
+            disp_pca2d.plotly_chart(pca2d(matches), use_container_width=True)
+        else:
+            disp_pca3d.info("Only available if more than 1 recognized face")
+            disp_pca2d.info("Only available if more than 1 recognized face")
+
+        # Show Gallery and Recognized Identities
+        if gallery:
+            disp_identities_gal.image(
+                image=[identity.face_aligned for identity in gallery],
+                caption=[match.name for match in gallery],
+            )
+        else:
+            disp_identities_gal.info("No gallery images")
+        if matches:
+            disp_identities_rec.image(
+                image=[
+                    identities[match.identity_idx].face_aligned for match in matches
+                ],
+                caption=[match.name for match in matches],
+            )
+        else:
+            disp_identities_rec.info("No recognized identities")
+
+# TODO Tracking of Detections -> Not flickering order of detections
+# Maybe make a sorting according to coordinates? somehow? in FaceDetections

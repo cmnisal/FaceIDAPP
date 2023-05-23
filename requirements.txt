@@ -10,3 +10,4 @@ streamlit-toggle-switch
 tflite-runtime
 twilio
 tqdm
+plotly
