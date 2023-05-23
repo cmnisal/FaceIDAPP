@@ -288,5 +288,7 @@ if ctx.state.playing:
             )
         else:
             disp_identities_rec.info("No recognized identities yet ...")
+else:
+    st.info("Starting stream can take a while - if it's not working, switch to twilio servers for streaming in 'Advanced Settings' ...")
 
 # BUG Recognized Identity Image is not updating on cloud version? (works on local!!!)
