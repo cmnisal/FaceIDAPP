@@ -102,8 +102,14 @@ class FaceDetection:
         total_boxes, stage_status = self.__stage2(frame, total_boxes, stage_status)
         bboxes, points = self.__stage3(frame, total_boxes, stage_status)
 
+        # Sort by location (to prevent flickering)
+        sort_idx = np.argsort(bboxes[:, 0])
+        bboxes = bboxes[sort_idx]
+        points = points[sort_idx]
+
         # Transform to better shape and points now inside bbox
         detections = []
+        cnt = 0
         for i in range(bboxes.shape[0]):
             conf = bboxes[i, -1].astype(np.float32)
             if conf > self.min_detections_conf:
@@ -111,12 +117,13 @@ class FaceDetection:
                 points_c = np.reshape(points[i], [2, 5]).transpose().astype(np.float32)
                 detections.append(
                     Detection(
-                        idx=i,
+                        idx=cnt,
                         bbox=list(bboxes_c),
                         landmarks=list(points_c),
                         confidence=conf,
                     )
                 )
+                cnt += 1
         return frame, detections
 
     def __compute_scale_pyramid(self, m, min_layer):

@@ -13,7 +13,7 @@ from tools.face_detection import FaceDetection
 from tools.face_recognition import FaceRecognition
 from tools.annotation import Annotation
 from tools.gallery import init_gallery
-from tools.pca import pca2d, pca3d
+from tools.pca import pca
 
 
 # Set logging level to error (To avoid getting spammed by queue warnings etc.)
@@ -68,6 +68,10 @@ with st.sidebar:
         st.markdown(
             "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
         )
+        model_name = st.selectbox("Model", ["mobileNet", "resNet"], index=0)
+        st.markdown(
+            "Note: The mobileNet model is smaller and faster, but less accurate. The resNet50 model is bigger and slower, but more accurate."
+        )
 
     st.markdown("# Face Gallery")
     files = st.sidebar.file_uploader(
@@ -85,7 +89,7 @@ with st.sidebar:
 
 
 gallery = init_gallery(
-    files, min_detections_conf=detection_confidence, min_similarity=similarity_threshold
+    files, min_detections_conf=detection_confidence, min_similarity=similarity_threshold, model_name=model_name
 )
 
 face_detector = FaceDetection(
@@ -93,14 +97,10 @@ face_detector = FaceDetection(
     min_face_size=detection_min_face_size,
     scale_factor=detection_scale_factor,
 )
-face_recognizer = FaceRecognition(min_similarity=similarity_threshold)
+face_recognizer = FaceRecognition(model_name=model_name, min_similarity=similarity_threshold)
 annotator = Annotation()
 
-stats_queue: "queue.Queue[Stats]" = queue.Queue()
-detections_queue: "queue.Queue[List[Detection]]" = queue.Queue()
-identities_queue: "queue.Queue[List[Identity]]" = queue.Queue()
-matches_queue: "queue.Queue[List[Match]]" = queue.Queue()
-
+transfer_queue: "queue.Queue[Stats, List[Detection], List[Identity], List[Match]]" = queue.Queue()
 
 def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     # Initialize detections
@@ -138,7 +138,7 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
         # Draw annotations
         start = time.time()
-        frame = annotator(frame, detections, identities, matches)
+        frame = annotator(frame, detections, identities, matches, gallery)
         stats = stats._replace(annotation=(time.time() - start) * 1000)
 
     # Convert frame back to av.VideoFrame
@@ -148,10 +148,7 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     stats = stats._replace(fps=1 / (time.time() - frame_start))
 
     # Send data to other thread
-    detections_queue.put_nowait(detections)
-    identities_queue.put_nowait(identities)
-    matches_queue.put_nowait(matches)
-    stats_queue.put_nowait(stats)
+    transfer_queue.put_nowait([stats, detections, identities, matches])
 
     return frame
 
@@ -192,42 +189,56 @@ tab_recognition, tab_metrics, tab_pca = st.tabs(
 
 with tab_recognition:
     # Display Gallery and Recognized Identities
-    col_identities_gal, col_identities_rec = st.columns(2)
-    col_identities_gal.markdown("**Gallery Identities**")
-    disp_identities_gal = col_identities_gal.info("No gallery images")
-    col_identities_rec.markdown("**Recognized Identities**")
-    disp_identities_rec = col_identities_rec.info("No recognized identities")
+    col1, col2 = st.columns(2)
+    col1.markdown("**Gallery Identities**")
+    disp_identities_gal = col1.info("No gallery images uploaded yet ...")
+    col2.markdown("**Recognized Identities**")
+    disp_identities_rec = col2.info("No recognized identities yet ...")
 
 with tab_metrics:
     # Display Detections and Identities
     st.markdown("**Detection Metrics**")
-    disp_detection_metrics = st.info("No detected faces")
+    disp_detection_metrics = st.info("No detected faces yet ...")
 
     # Display Recognition Metrics
     st.markdown("**Recognition Metrics**")
-    disp_recognition_metrics = st.info("No recognized identities")
+    disp_recognition_metrics = st.info("No recognized identities yet ...")
 
 with tab_pca:
-    # Display PCA2D
-    st.markdown("**PCA 2D**")
-    disp_pca2d = st.info("Only available if more than 1 recognized face")
+    # Display 2D and 3D PCA
+    col1, col2 = st.columns(2)
+    col1.markdown("**PCA 2D**")
+    disp_pca3d = col1.info("Only available if more than 1 recognized face ...")
+    col2.markdown("**PCA 3D**")
+    disp_pca2d = col2.info("Only available if more than 1 recognized face ...")
+    freeze_pcas = st.button("Freeze PCAs for Interaction", key="reset_pca")
 
-    # Display PCA3D
-    st.markdown("**PCA 3D**")
-    disp_pca3d = st.info("Only available if more than 1 recognized face")
+    # Show PCAs
+    if freeze_pcas and gallery:
+        col1, col2 = st.columns(2)
+        col1.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=3), use_container_width=True)
+        col2.plotly_chart(pca(st.session_state.matches, st.session_state.identities, gallery, dim=2), use_container_width=True)
 
-    # Display Matched Faces
-    st.markdown("**Matches**")
-    disp_matches = st.info("No recognized identities")
+
+# Show Gallery Identities
+if gallery:
+    disp_identities_gal.image(
+        image=[identity.face_aligned for identity in gallery],
+        caption=[match.name for match in gallery],
+    )
+else:
+    disp_identities_gal.info("No gallery images uploaded yet ...")
+
 
 # Display Live Stats
 if ctx.state.playing:
     while True:
         # Retrieve data from other thread
-        identities = identities_queue.get()
-        detections = detections_queue.get()
-        matches = matches_queue.get()
-        stats = stats_queue.get()
+        stats, detections, identities, matches = transfer_queue.get()
+
+        # Save for PCA Snapshot
+        st.session_state.identities = identities
+        st.session_state.matches = matches
 
         # Show Stats
         disp_stats.dataframe(
@@ -242,44 +253,33 @@ if ctx.state.playing:
                 use_container_width=True,
             )
         else:
-            disp_detection_metrics.info("No detected faces")
+            disp_detection_metrics.info("No detected faces yet ...")
 
         # Show Match Metrics
         if matches:
             disp_recognition_metrics.dataframe(
-                pd.DataFrame(matches)
-                .drop(columns=["faces", "faces_aligned"])
-                .applymap(lambda x: (format_dflist(x))),
+                pd.DataFrame(matches).applymap(lambda x: (format_dflist(x))),
                 use_container_width=True,
             )
         else:
-            disp_recognition_metrics.info("No recognized identities")
+            disp_recognition_metrics.info("No recognized identities yet ...")
 
-        # Show PCAs
         if len(matches) > 1:
-            disp_pca3d.plotly_chart(pca3d(matches), use_container_width=True)
-            disp_pca2d.plotly_chart(pca2d(matches), use_container_width=True)
+            disp_pca3d.plotly_chart(pca(matches, identities, gallery, dim=3), use_container_width=True)
+            disp_pca2d.plotly_chart(pca(matches, identities, gallery, dim=2), use_container_width=True)
         else:
-            disp_pca3d.info("Only available if more than 1 recognized face")
-            disp_pca2d.info("Only available if more than 1 recognized face")
+            disp_pca3d.info("Only available if more than 1 recognized face ...")
+            disp_pca2d.info("Only available if more than 1 recognized face ...")
 
-        # Show Gallery and Recognized Identities
-        if gallery:
-            disp_identities_gal.image(
-                image=[identity.face_aligned for identity in gallery],
-                caption=[match.name for match in gallery],
-            )
-        else:
-            disp_identities_gal.info("No gallery images")
+        # Show Recognized Identities
         if matches:
             disp_identities_rec.image(
                 image=[
                     identities[match.identity_idx].face_aligned for match in matches
                 ],
-                caption=[match.name for match in matches],
+                caption=[gallery[match.gallery_idx].name for match in matches],
             )
         else:
-            disp_identities_rec.info("No recognized identities")
+            disp_identities_rec.info("No recognized identities yet ...")
 
-# TODO Tracking of Detections -> Not flickering order of detections
-# Maybe make a sorting according to coordinates? somehow? in FaceDetections
+# BUG Recognized Identity Image is not updating on cloud version? (works on local)

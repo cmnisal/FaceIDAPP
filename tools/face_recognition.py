@@ -89,13 +89,14 @@ class FaceRecognition:
                 matches.append(
                     Match(
                         identity_idx=identity.detection_idx,
-                        faces_aligned=np.concatenate([identity.face_aligned, gallery[idx_min].face_aligned], axis=1),
-                        name=gallery[idx_min].name,
+                        gallery_idx=idx_min,
                         distance=dist_to_identity[idx_min],
-                        embedding_gal=gallery[idx_min].embedding,
-                        embedding_det=identity.embedding,
+                        name=gallery[idx_min].name,
                     )
                 )
+        
+        # Sort Matches by identity_idx
+        matches = sorted(matches, key=lambda match: match.gallery_idx)
 
         return matches
 

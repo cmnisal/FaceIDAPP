@@ -14,7 +14,6 @@ class Identity(NamedTuple):
     name: str = None
     embedding: np.ndarray = None
     face_aligned: np.ndarray = None
-    face: np.ndarray = None
 
 
 class Stats(NamedTuple):
@@ -29,9 +28,6 @@ class Stats(NamedTuple):
 
 class Match(NamedTuple):
     identity_idx: int = None
-    faces_aligned: np.ndarray = None
-    faces: np.ndarray = None
+    gallery_idx: int = None
     distance: float = None
     name: str = None
-    embedding_gal: np.ndarray = None
-    embedding_det: np.ndarray = None

@@ -9,7 +9,7 @@ class Annotation:
         self.name = draw_name
         self.upscale = upscale
 
-    def __call__(self, frame, detections, identities, matches):
+    def __call__(self, frame, detections, identities, matches, gallery):
         shape = np.asarray(frame.shape[:2][::-1])
         if self.upscale:
             frame = cv2.resize(frame, (1920, 1080))
@@ -60,7 +60,15 @@ class Annotation:
         # Draw Name
         if self.name:
             for match in matches:
-                detection = detections[identities[match.identity_idx].detection_idx]
+                try:
+                    detection = detections[identities[match.identity_idx].detection_idx]
+                except:
+                    print("Identity IDX: ", match.identity_idx)
+                    print("Len(Detections): ", len(detections))
+                    print("Len(Identites): ", len(identities))
+                    print("Detection IDX: ", identities[match.identity_idx].detection_idx)
+                    
+                    # print("Detections: ", detections)
 
                 cv2.rectangle(
                     frame,
@@ -86,7 +94,7 @@ class Annotation:
 
                 cv2.putText(
                     frame,
-                    match.name,
+                    gallery[match.gallery_idx].name,
                     (
                         ((detection.bbox[0][0] + shape[0] // 400) * upscale_factor[0]).astype(int),
                         ((detection.bbox[0][1] - shape[1] // 100) * upscale_factor[1]).astype(int),

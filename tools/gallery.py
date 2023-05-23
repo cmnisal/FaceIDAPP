@@ -6,9 +6,9 @@ import os
 import numpy as np
 
 
-def init_gallery(files, min_detections_conf=0.8, min_similarity=0.67):
+def init_gallery(files, min_detections_conf=0.8, min_similarity=0.67, model_name="mobileNet"):
     face_detector = FaceDetection(min_detections_conf=min_detections_conf)
-    face_recognizer = FaceRecognition(min_similarity=min_similarity)
+    face_recognizer = FaceRecognition(model_name=model_name, min_similarity=min_similarity)
 
     gallery = []
     for file in files:
