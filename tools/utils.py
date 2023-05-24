@@ -95,29 +95,6 @@ def rgb(r, g, b):
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
 
-def tflite_inference(model, img):
-    """Inferences an image through the model with tflite interpreter on CPU
-    :param model: a tflite.Interpreter loaded with a model
-    :param img: image
-    :return: list of outputs of the model
-    """
-    # Check if img is np.ndarray
-    if not isinstance(img, np.ndarray):
-        img = np.asarray(img)
-
-    # Check if dim is 4
-    if len(img.shape) == 3:
-        img = np.expand_dims(img, axis=0)
-
-    input_details = model.get_input_details()
-    output_details = model.get_output_details()
-    model.resize_tensor_input(input_details[0]["index"], img.shape)
-    model.allocate_tensors()
-    model.set_tensor(input_details[0]["index"], img.astype(np.float32))
-    model.invoke()
-    return [model.get_tensor(elem["index"]) for elem in output_details]
-
-
 def get_file(origin, file_hash, is_zip=False):
     tmp_file = os.path.join(tempfile.gettempdir(), "FaceIDLight", origin.split("/")[-1])
     os.makedirs(os.path.dirname(tmp_file), exist_ok=True)

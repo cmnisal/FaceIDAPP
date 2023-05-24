@@ -1,7 +1,6 @@
-import tflite_runtime.interpreter as tflite
+import tensorflow as tf
 import cv2
 import numpy as np
-from .utils import tflite_inference
 from .nametypes import Detection
 from .utils import get_file
 
@@ -59,9 +58,32 @@ class FaceDetection:
         self._steps_threshold = steps_threshold
         self._scale_factor = scale_factor
         self.min_detections_conf = min_detections_conf
-        self.p_net = tflite.Interpreter(model_path=get_file(BASE_URL + "p_net.tflite", FILE_HASHES["p_net"]))
-        self.r_net = tflite.Interpreter(model_path=get_file(BASE_URL + "r_net.tflite", FILE_HASHES["r_net"]))
-        self.o_net = tflite.Interpreter(model_path=get_file(BASE_URL + "o_net.tflite", FILE_HASHES["o_net"]))
+        self.p_net = tf.lite.Interpreter(model_path=get_file(BASE_URL + "p_net.tflite", FILE_HASHES["p_net"]))
+        self.r_net = tf.lite.Interpreter(model_path=get_file(BASE_URL + "r_net.tflite", FILE_HASHES["r_net"]))
+        self.o_net = tf.lite.Interpreter(model_path=get_file(BASE_URL + "o_net.tflite", FILE_HASHES["o_net"]))
+
+    @staticmethod
+    def __tflite_inference(model, img):
+        """Inferences an image through the model with tflite interpreter on CPU
+        :param model: a tflite.Interpreter loaded with a model
+        :param img: image
+        :return: list of outputs of the model
+        """
+        # Check if img is np.ndarray
+        if not isinstance(img, np.ndarray):
+            img = np.asarray(img)
+
+        # Check if dim is 4
+        if len(img.shape) == 3:
+            img = np.expand_dims(img, axis=0)
+
+        input_details = model.get_input_details()
+        output_details = model.get_output_details()
+        model.resize_tensor_input(input_details[0]["index"], img.shape)
+        model.allocate_tensors()
+        model.set_tensor(input_details[0]["index"], img.astype(np.float32))
+        model.invoke()
+        return [model.get_tensor(elem["index"]) for elem in output_details]
 
     def __call__(self, frame):
         """
@@ -308,7 +330,7 @@ class FaceDetection:
             img_x = np.expand_dims(scaled_image, 0)
             img_y = np.transpose(img_x, (0, 2, 1, 3))
 
-            out = tflite_inference(self.p_net, img_y)
+            out = __tflite_inference(self.p_net, img_y)
 
             out0 = np.transpose(out[0], (0, 2, 1, 3))
             out1 = np.transpose(out[1], (0, 2, 1, 3))
@@ -390,7 +412,7 @@ class FaceDetection:
         tempimg = (tempimg - 127.5) * 0.0078125
         tempimg1 = np.transpose(tempimg, (3, 1, 0, 2))
 
-        out = tflite_inference(self.r_net, tempimg1)
+        out = __tflite_inference(self.r_net, tempimg1)
 
         out0 = np.transpose(out[0])
         out1 = np.transpose(out[1])
@@ -449,7 +471,7 @@ class FaceDetection:
         tempimg = (tempimg - 127.5) * 0.0078125
         tempimg1 = np.transpose(tempimg, (3, 1, 0, 2))
 
-        out = tflite_inference(self.o_net, tempimg1)
+        out = __tflite_inference(self.o_net, tempimg1)
         out0 = np.transpose(out[0])
         out1 = np.transpose(out[1])
         out2 = np.transpose(out[2])

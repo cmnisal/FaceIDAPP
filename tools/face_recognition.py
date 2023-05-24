@@ -1,21 +1,9 @@
-from .utils import tflite_inference
 from .nametypes import Identity, Match
 from sklearn.metrics.pairwise import cosine_distances
 import numpy as np
 import cv2
 from skimage.transform import SimilarityTransform
-from .utils import get_file
-import tflite_runtime.interpreter as tflite
 from typing import Literal
-
-
-BASE_URL = "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/"
-
-FILE_HASHES = {
-    "mobileNet": "6c19b789f661caa8da735566490bfd8895beffb2a1ec97a56b126f0539991aa6",
-    "resNet": "f4d8b0194957a3ad766135505fc70a91343660151a8103bbb6c3b8ac34dbb4e2",
-}
-
 
 class FaceRecognition:
     def __init__(
@@ -24,7 +12,20 @@ class FaceRecognition:
         model_name: Literal["mobileNet", "resNet50"] = "mobileNet",
     ):
         self.min_similarity = min_similarity
-        self.model = tflite.Interpreter(model_path=get_file(BASE_URL + f"{model_name}.tflite", FILE_HASHES[model_name]))
+        if model_name == "mobileNet":
+            from .models import MobileNetV2
+            self.model = MobileNetV2()
+        elif model_name == "resNet50":
+            from .models import ResNet50
+            self.model = ResNet50()
+        elif model_name == "ArcFaceOctupletLoss":
+            from .models import ArcFaceOctupletLoss
+            self.model = ArcFaceOctupletLoss(batch_size=32)
+        else:
+            raise ValueError(
+                f"model_name must be one of ['mobileNet', 'resNet50', 'arcFace'], got {model_name}"
+            )
+
 
     def __call__(self, frame, detections):
         # Align Faces
@@ -49,7 +50,7 @@ class FaceRecognition:
         # Normalize images from [0, 255] to [0, 1]
         faces_aligned_norm = np.asarray(faces_aligned).astype(np.float32) / 255.0
 
-        embs_det = tflite_inference(self.model, faces_aligned_norm)
+        embs_det = self.model(faces_aligned_norm)
         embs_det = np.asarray(embs_det[0])
 
         # Save Identities
@@ -97,6 +98,9 @@ class FaceRecognition:
 
     @staticmethod
     def align(img, landmarks_source, target_size=(112, 112)):
+        if isinstance(landmarks_source, list):
+            landmarks_source = np.array(landmarks_source, dtype=np.float32)
+
         landmarks_target = np.array(
             [
                 [38.2946, 51.6963],
