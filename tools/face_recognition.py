@@ -5,12 +5,15 @@ import cv2
 from skimage.transform import SimilarityTransform
 from typing import Literal
 
+
 class FaceRecognition:
     def __init__(
         self,
         min_similarity: float = 0.67,
         model_name: Literal["mobileNet", "resNet50"] = "mobileNet",
     ):
+        
+        # TODO move imports to top, when running
         self.min_similarity = min_similarity
         if model_name == "MobileNetV2":
             from .models import MobileNetV2

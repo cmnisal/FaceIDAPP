@@ -1,17 +1,7 @@
-import tensorflow as tf
 import cv2
 import numpy as np
 from .nametypes import Detection
-from .utils import get_file
-
-
-BASE_URL = "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/"
-
-FILE_HASHES = {
-    "o_net": "768385d570300648b7b881acbd418146522b79b4771029bb2e684bdd8c764b9f",
-    "p_net": "530183192e24f7cc86b6706e1eb600482c4ed4306399ac939c472e3957bae15e",
-    "r_net": "5ec33b065eb2802bc4c2575d21feff1a56958d854785bc3e2907d3b7ace861a2",
-}
+from tools.models import MTCNN
 
 
 class StageStatus:
@@ -58,9 +48,8 @@ class FaceDetection:
         self._steps_threshold = steps_threshold
         self._scale_factor = scale_factor
         self.min_detections_conf = min_detections_conf
-        self.p_net = tf.lite.Interpreter(model_path=get_file(BASE_URL + "p_net.tflite", FILE_HASHES["p_net"]))
-        self.r_net = tf.lite.Interpreter(model_path=get_file(BASE_URL + "r_net.tflite", FILE_HASHES["r_net"]))
-        self.o_net = tf.lite.Interpreter(model_path=get_file(BASE_URL + "o_net.tflite", FILE_HASHES["o_net"]))
+        self.model = MTCNN()
+
 
     @staticmethod
     def __tflite_inference(model, img):
@@ -330,7 +319,7 @@ class FaceDetection:
             img_x = np.expand_dims(scaled_image, 0)
             img_y = np.transpose(img_x, (0, 2, 1, 3))
 
-            out = self.__tflite_inference(self.p_net, img_y)
+            out = self.model.p_net(img_y)
 
             out0 = np.transpose(out[0], (0, 2, 1, 3))
             out1 = np.transpose(out[1], (0, 2, 1, 3))
@@ -412,7 +401,7 @@ class FaceDetection:
         tempimg = (tempimg - 127.5) * 0.0078125
         tempimg1 = np.transpose(tempimg, (3, 1, 0, 2))
 
-        out = self.__tflite_inference(self.r_net, tempimg1)
+        out = self.model.r_net(tempimg1)
 
         out0 = np.transpose(out[0])
         out1 = np.transpose(out[1])
@@ -471,7 +460,7 @@ class FaceDetection:
         tempimg = (tempimg - 127.5) * 0.0078125
         tempimg1 = np.transpose(tempimg, (3, 1, 0, 2))
 
-        out = self.__tflite_inference(self.o_net, tempimg1)
+        out = self.model.o_net(tempimg1)
         out0 = np.transpose(out[0])
         out1 = np.transpose(out[1])
         out2 = np.transpose(out[2])

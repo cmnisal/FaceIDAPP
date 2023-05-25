@@ -38,3 +38,5 @@ torch.save(model.state_dict(), "model-weights.pt")
 # model.eval()
 
 # print(1)
+
+# TODO make tf lite model from ArcFaceOctupletLoss and PTLite Model from FaceTransformerOctupletLoss!
