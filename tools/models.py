@@ -24,7 +24,7 @@ class TFModel:
             img = np.expand_dims(img, axis=0)
         return img
 
-    def __inference(self, img):
+    def _inference(self, img):
         return self.model.predict(self.__preprocess(img))
 
 
@@ -38,7 +38,7 @@ class ArcFaceOctupletLoss(TFModel):
     def __call__(self, imgs):
         embs = []
         for i in range(0, imgs.shape[0], self.batch_size):
-            embs.append(self.__inference(imgs[i : i + self.batch_size]))
+            embs.append(self._inference(imgs[i : i + self.batch_size]))
         return np.concatenate(embs)
 
 
@@ -49,7 +49,7 @@ class PyTorchModel:
         img = torch.from_numpy(np.transpose(img, [0, 3, 1, 2]).astype("float32") * 255).clamp(0.0, 255.0).to(self.device)
         return img
 
-    def __inference(self, img) -> np.ndarray:
+    def _inference(self, img) -> np.ndarray:
         return self.model(self.__preprocess(img)).cpu().detach().numpy()
 
 
@@ -63,12 +63,12 @@ class FaceTransformerOctupletLoss(PyTorchModel):
     def __call__(self, imgs):
         embs = []
         for i in range(0, imgs.shape[0], self.batch_size):
-            embs.append(self.__inference(imgs[i : i + self.batch_size]))
+            embs.append(self._inference(imgs[i : i + self.batch_size]))
         return np.concatenate(embs)
 
 
 class TFLiteModel:
-    def __inference(self, img):
+    def _inference(self, img):
         """Inferences an image through the model with tflite interpreter on CPU
         :param model: a tflite.Interpreter loaded with a model
         :param img: image
@@ -96,7 +96,7 @@ class MobileNetV2(TFLiteModel):
         self.model = tf.lite.Interpreter(model_path=get_file(URLS["mobileNet"], FILE_HASHES["mobileNet"]))
 
     def __call__(self, imgs):
-        return self.__inference(imgs)
+        return self._inference(imgs)
 
 
 class ResNet50(TFLiteModel):
@@ -104,4 +104,4 @@ class ResNet50(TFLiteModel):
         self.model = tf.lite.Interpreter(model_path=get_file(URLS["resNet"], FILE_HASHES["resNet"]))
 
     def __call__(self, imgs):
-        return self.__inference(imgs)
+        return self._inference(imgs)
