@@ -55,7 +55,7 @@ class PyTorchModel:
 
 class FaceTransformerOctupletLoss(PyTorchModel):
     def __init__(self, batch_size=32) -> None:
-        self.device = torch.device("cuda")  # or cuda
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = torch.load(get_file(URLS["FaceTransformerOctupletLoss"], FILE_HASHES["FaceTransformerOctupletLoss"]), map_location=self.device)
         self.model.eval()
         self.batch_size = batch_size
