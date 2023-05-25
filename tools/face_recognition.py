@@ -27,9 +27,12 @@ class FaceRecognition:
         elif model_name == "FaceTransformerOctupletLoss":
             from .models import FaceTransformerOctupletLoss
             self.model = FaceTransformerOctupletLoss()
+        elif model_name == "MobileNetV2ONNX":
+            from .models import MobileNetV2ONNX
+            self.model = MobileNetV2ONNX()
         else:
             raise ValueError(
-                f"model_name must be one of ['MobileNetV2', 'ResNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
+                f"model_name must be one of ['MobileNetV2ONNX', 'MobileNetV2', 'ResNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
             )
 
 

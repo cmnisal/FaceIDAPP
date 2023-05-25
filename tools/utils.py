@@ -73,6 +73,8 @@ def get_ice_servers(name="twilio"):
             },
         ]
         return ice_servers
+    elif name == "local":
+        return [{"urls": ["stun:stun.l.google.com:19302"]}]
     else:
         raise ValueError(f"Unknown name: {name}")
 

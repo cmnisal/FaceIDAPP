@@ -3,13 +3,15 @@ import tensorflow as tf
 import torch
 from .utils import get_file
 from .vit_face import ViT_face
+import onnxruntime as rt
 
 
 # TODO merge into single dict
+# TODO make progress bars in Streamlit visible
 URLS = {
-    "o_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/",
-    "p_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/",
-    "r_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/",
+    "o_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/o_net.tflite",
+    "p_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/p_net.tflite",
+    "r_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/r_net.tflite",
     "MobileNetV2": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/mobileNet.tflite",
     "ResNet50": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/resNet.tflite",
     "FaceTransformerOctupletLoss": "https://github.com/Martlgap/FaceIDAPP/releases/download/untagged-0646165ee2e1ac8d6b29/FaceTransformerOctupletLoss.pt",
@@ -98,7 +100,8 @@ class FaceTransformerOctupletLoss(PTModel):
 
 
 class TFLiteModel:
-    def _inference(self, img):
+    @staticmethod
+    def _inference(model, img):
         """Inferences an image through the model with tflite interpreter on CPU
         :param model: a tflite.Interpreter loaded with a model
         :param img: image
@@ -112,13 +115,13 @@ class TFLiteModel:
         if len(img.shape) == 3:
             img = np.expand_dims(img, axis=0)
 
-        input_details = self.model.get_input_details()
-        output_details = self.model.get_output_details()
-        self.model.resize_tensor_input(input_details[0]["index"], img.shape)
-        self.model.allocate_tensors()
-        self.model.set_tensor(input_details[0]["index"], img.astype(np.float32))
-        self.model.invoke()
-        return [self.model.get_tensor(elem["index"]) for elem in output_details][0]
+        input_details = model.get_input_details()
+        output_details = model.get_output_details()
+        model.resize_tensor_input(input_details[0]["index"], img.shape)
+        model.allocate_tensors()
+        model.set_tensor(input_details[0]["index"], img.astype(np.float32))
+        model.invoke()
+        return [model.get_tensor(elem["index"]) for elem in output_details]
 
 
 class MobileNetV2(TFLiteModel):
@@ -126,7 +129,7 @@ class MobileNetV2(TFLiteModel):
         self.model = tf.lite.Interpreter(model_path=get_file(URLS["MobileNetV2"], FILE_HASHES["MobileNetV2"]))
 
     def __call__(self, imgs):
-        return self._inference(imgs)
+        return self._inference(self.model, imgs)[0]
 
 
 class ResNet50(TFLiteModel):
@@ -134,20 +137,33 @@ class ResNet50(TFLiteModel):
         self.model = tf.lite.Interpreter(model_path=get_file(URLS["ResNet50"], FILE_HASHES["ResNet50"]))
 
     def __call__(self, imgs):
-        return self._inference(imgs)
+        return self._inference(self.model, imgs)[0]
 
 
 class MTCNN(TFLiteModel):
     def __init__(self) -> None:
-        self.p_net = tf.lite.Interpreter(model_path=get_file(URLS["p_net"], FILE_HASHES["p_net"]))
-        self.r_net = tf.lite.Interpreter(model_path=get_file(URLS["r_net"], FILE_HASHES["r_net"]))
-        self.o_net = tf.lite.Interpreter(model_path=get_file(URLS["o_net"], FILE_HASHES["o_net"]))
+        self.p_net_model = tf.lite.Interpreter(model_path=get_file(URLS["p_net"], FILE_HASHES["p_net"]))
+        self.r_net_model = tf.lite.Interpreter(model_path=get_file(URLS["r_net"], FILE_HASHES["r_net"]))
+        self.o_net_model = tf.lite.Interpreter(model_path=get_file(URLS["o_net"], FILE_HASHES["o_net"]))
 
-    def o_net(self, inp):
-        return self._inference(self.o_net, inp)
-        
-    def r_net(self, inp):
-        return self._inference(self.r_net, inp)
-    
     def p_net(self, inp):
-        return self._inference(self.p_net, inp)
+        return self._inference(self.p_net_model, inp)
+    
+    def r_net(self, inp):
+        return self._inference(self.r_net_model, inp)
+    
+    def o_net(self, inp):
+        return self._inference(self.o_net_model, inp)
+        
+
+class ONNXModel:
+    @staticmethod
+    def _inference(sess, imgs):
+        return sess.run(None, {"input_image": imgs.astype(np.float32)})[0]
+    
+class MobileNetV2ONNX(ONNXModel):
+    def __init__(self) -> None:
+        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=['CUDAExecutionProvider']) #rt.get_available_providers())
+    
+    def __call__(self, imgs):
+        return self._inference(self.sess, imgs)
