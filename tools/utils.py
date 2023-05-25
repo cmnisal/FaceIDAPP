@@ -95,8 +95,8 @@ def rgb(r, g, b):
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
 
-def get_file(origin, file_hash, is_zip=False):
-    tmp_file = os.path.join(tempfile.gettempdir(), "FaceIDLight", origin.split("/")[-1])
+def get_file(origin, file_hash):
+    tmp_file = os.path.join(tempfile.gettempdir(), "FaceIDAPP", origin.split("/")[-1])
     os.makedirs(os.path.dirname(tmp_file), exist_ok=True)
     if not os.path.exists(tmp_file):
         download = True
@@ -107,7 +107,7 @@ def get_file(origin, file_hash, is_zip=False):
                 hasher.update(chunk)
         if not hasher.hexdigest() == file_hash:
             print(
-                "A local file was found, but it seems to be incomplete or outdated because the file hash does not "
+                f"A local file was found (Hash: {hasher.hexdigest()}), but it seems to be incomplete or outdated because the file hash does not "
                 "match the original value of " + file_hash + " so data will be downloaded."
             )
             download = True
@@ -126,10 +126,10 @@ def get_file(origin, file_hash, is_zip=False):
             for chunk in response:
                 file.write(chunk)
             file.close()
-    if is_zip:
+    if origin.endswith(".zip"):
         with ZipFile(tmp_file, "r") as zipObj:
-            zipObj.extractall(tmp_file.split(".")[0])
-        tmp_file = os.path.join(tmp_file.split(".")[0])
+            zipObj.extractall(os.path.dirname(tmp_file))
+        tmp_file = tmp_file.replace(".zip", "")
     return tmp_file
 
 

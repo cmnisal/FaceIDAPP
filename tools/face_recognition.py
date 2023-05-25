@@ -20,10 +20,13 @@ class FaceRecognition:
             self.model = ResNet50()
         elif model_name == "ArcFaceOctupletLoss":
             from .models import ArcFaceOctupletLoss
-            self.model = ArcFaceOctupletLoss(batch_size=32)
+            self.model = ArcFaceOctupletLoss()
+        elif model_name == "FaceTransformerOctupletLoss":
+            from .models import FaceTransformerOctupletLoss
+            self.model = FaceTransformerOctupletLoss()
         else:
             raise ValueError(
-                f"model_name must be one of ['mobileNet', 'resNet50', 'arcFace'], got {model_name}"
+                f"model_name must be one of ['mobileNet', 'resNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
             )
 
 
