@@ -58,9 +58,9 @@ with st.sidebar:
         st.markdown(
             "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
         )
-        model_name = st.selectbox("Model", ["mobileNet", "resNet", "ArcFaceOctupletLoss", "FaceTransformerOctupletLoss"], index=3)
+        model_name = st.selectbox("Model", ["MobileNetV2", "ResNet50", "ArcFaceOctupletLoss", "FaceTransformerOctupletLoss"], index=1)
         st.markdown(
-            "Note: The mobileNet model is smaller and faster, but less accurate. The resNet50 model is bigger and slower, but more accurate."
+            "Note: The mobileNet model is smaller and faster, but less accurate. The resNet model is bigger and slower, but more accurate."
         )
 
     st.markdown("# Face Gallery")

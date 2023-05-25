@@ -1,7 +1,5 @@
-import streamlit as st
-import tensorflow as tf
-from tools.utils import get_file
 import torch
+from tools.utils import get_file
 
 URLS = {
     "mobileNet": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/mobileNet.tflite",
@@ -17,10 +15,26 @@ FILE_HASHES = {
     "ArcFaceOctupletLoss": "8603f374fd385081ce5ce80f5997e3363f4247c8bbad0b8de7fb26a80468eeea",
 }
 
-st.title("FaceIDLight")
-
 filename = get_file(URLS["FaceTransformerOctupletLoss"], FILE_HASHES["FaceTransformerOctupletLoss"])
-st.write(filename)
-
 model = torch.load(filename)
-st.write(model)
+
+torch.save(model.state_dict(), "model-weights.pt")
+# from tools.vit_face import ViT_face
+
+# model = ViT_face(
+#     loss_type = "CosFace",
+#     GPU_ID = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+#     num_class = 93431,
+#     image_size=112,
+#     patch_size=8,
+#     dim=512,
+#     depth=20,
+#     heads=8,
+#     mlp_dim=2048,
+#     dropout=0.1,
+#     emb_dropout=0.1
+# )
+# model.load_state_dict(torch.load("model-weights.pt"))
+# model.eval()
+
+# print(1)

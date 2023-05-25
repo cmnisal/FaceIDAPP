@@ -12,10 +12,10 @@ class FaceRecognition:
         model_name: Literal["mobileNet", "resNet50"] = "mobileNet",
     ):
         self.min_similarity = min_similarity
-        if model_name == "mobileNet":
+        if model_name == "MobileNetV2":
             from .models import MobileNetV2
             self.model = MobileNetV2()
-        elif model_name == "resNet50":
+        elif model_name == "ResNet50":
             from .models import ResNet50
             self.model = ResNet50()
         elif model_name == "ArcFaceOctupletLoss":
@@ -26,7 +26,7 @@ class FaceRecognition:
             self.model = FaceTransformerOctupletLoss()
         else:
             raise ValueError(
-                f"model_name must be one of ['mobileNet', 'resNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
+                f"model_name must be one of ['MobileNetV2', 'ResNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
             )
 
 
