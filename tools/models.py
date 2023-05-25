@@ -163,6 +163,15 @@ class ONNXModel:
     
 class MobileNetV2ONNX(ONNXModel):
     def __init__(self) -> None:
-        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=['CUDAExecutionProvider']) #rt.get_available_providers())    
+        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=['CUDAExecutionProvider']) #rt.get_available_providers())
+    # TODO somehow show if CPU or GPU is used?
     def __call__(self, imgs):
+        return self._inference(self.sess, imgs)
+
+class FaceTransformerONNX(ONNXModel):
+    def __init__(self) -> None:
+        self.sess = rt.InferenceSession("./FaceTransformerOctupletLoss.onnx", providers=rt.get_available_providers())
+
+    def __call__(self, imgs):
+        imgs = (np.transpose(imgs, [0, 3, 1, 2]).astype("float32") * 255).clip(0.0, 255.0)
         return self._inference(self.sess, imgs)
