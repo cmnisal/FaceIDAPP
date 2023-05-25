@@ -163,7 +163,6 @@ class ONNXModel:
     
 class MobileNetV2ONNX(ONNXModel):
     def __init__(self) -> None:
-        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=['CUDAExecutionProvider']) #rt.get_available_providers())
-    
+        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=['CUDAExecutionProvider']) #rt.get_available_providers())    
     def __call__(self, imgs):
         return self._inference(self.sess, imgs)
