@@ -54,7 +54,7 @@ class FaceRecognition:
         faces_aligned_norm = np.asarray(faces_aligned).astype(np.float32) / 255.0
 
         embs_det = self.model(faces_aligned_norm)
-        embs_det = np.asarray(embs_det[0])
+        embs_det = np.asarray(embs_det)
 
         # Save Identities
         identities = []

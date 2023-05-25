@@ -88,7 +88,7 @@ class TFLiteModel:
         self.model.allocate_tensors()
         self.model.set_tensor(input_details[0]["index"], img.astype(np.float32))
         self.model.invoke()
-        return [self.model.get_tensor(elem["index"]) for elem in output_details]
+        return [self.model.get_tensor(elem["index"]) for elem in output_details][0]
 
 
 class MobileNetV2(TFLiteModel):
