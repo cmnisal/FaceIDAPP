@@ -148,30 +148,33 @@ class MTCNN(TFLiteModel):
 
     def p_net(self, inp):
         return self._inference(self.p_net_model, inp)
-    
+
     def r_net(self, inp):
         return self._inference(self.r_net_model, inp)
-    
+
     def o_net(self, inp):
         return self._inference(self.o_net_model, inp)
-        
+
 
 class ONNXModel:
     @staticmethod
     def _inference(sess, imgs):
         return sess.run(None, {"input_image": imgs.astype(np.float32)})[0]
-    
+
+
 class MobileNetV2ONNX(ONNXModel):
     def __init__(self) -> None:
-        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=['CUDAExecutionProvider']) #rt.get_available_providers())
+        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=rt.get_available_providers())
+
     # TODO somehow show if CPU or GPU is used?
     def __call__(self, imgs):
         return self._inference(self.sess, imgs)
+
 
 class FaceTransformerONNX(ONNXModel):
     def __init__(self) -> None:
         self.sess = rt.InferenceSession("./FaceTransformerOctupletLoss.onnx", providers=rt.get_available_providers())
 
     def __call__(self, imgs):
-        imgs = (np.transpose(imgs, [0, 3, 1, 2]).astype("float32") * 255).clip(0.0, 255.0)
+        imgs = (np.transpose(imgs, [0, 3, 1, 2]) * 255.0).clip(0.0, 255.0)
         return self._inference(self.sess, imgs)

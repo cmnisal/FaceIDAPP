@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from .nametypes import Detection
 from tools.models import MTCNN
+import time
 
 
 class StageStatus:
@@ -50,30 +51,6 @@ class FaceDetection:
         self.min_detections_conf = min_detections_conf
         self.model = MTCNN()
 
-
-    @staticmethod
-    def __tflite_inference(model, img):
-        """Inferences an image through the model with tflite interpreter on CPU
-        :param model: a tflite.Interpreter loaded with a model
-        :param img: image
-        :return: list of outputs of the model
-        """
-        # Check if img is np.ndarray
-        if not isinstance(img, np.ndarray):
-            img = np.asarray(img)
-
-        # Check if dim is 4
-        if len(img.shape) == 3:
-            img = np.expand_dims(img, axis=0)
-
-        input_details = model.get_input_details()
-        output_details = model.get_output_details()
-        model.resize_tensor_input(input_details[0]["index"], img.shape)
-        model.allocate_tensors()
-        model.set_tensor(input_details[0]["index"], img.astype(np.float32))
-        model.invoke()
-        return [model.get_tensor(elem["index"]) for elem in output_details]
-
     def __call__(self, frame):
         """
         Detects bounding boxes from the specified image.
@@ -96,10 +73,14 @@ class FaceDetection:
         min_layer = np.amin([height, width]) * m
         scales = self.__compute_scale_pyramid(m, min_layer)
 
+        start = time.time()
+
         # We pipe here each of the stages
         total_boxes, stage_status = self.__stage1(frame, scales, stage_status)
         total_boxes, stage_status = self.__stage2(frame, total_boxes, stage_status)
         bboxes, points = self.__stage3(frame, total_boxes, stage_status)
+
+        print("Time: {:.3f} ms".format((time.time() - start) * 1000))
 
         # Sort by location (to prevent flickering)
         sort_idx = np.argsort(bboxes[:, 0])
