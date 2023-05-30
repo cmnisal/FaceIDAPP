@@ -49,16 +49,27 @@ with st.sidebar:
         )
         st.markdown("---")
         st.markdown("## Face Detection")
-        detection_min_face_size = st.slider("Min Face Size", min_value=5, max_value=120, value=40)
-        detection_scale_factor = st.slider("Scale Factor", min_value=0.1, max_value=1.0, value=0.7)
-        detection_confidence = st.slider("Min Detection Confidence", min_value=0.5, max_value=1.0, value=0.9)
+        detection_type = st.selectbox("Detection Type", ["MTCNN", "MEDIAPIPE"], index=1)
+
+        if detection_type == "MTCNN":
+            detection_min_face_size = st.slider("Min Face Size", min_value=5, max_value=120, value=40)
+            detection_scale_factor = st.slider("Scale Factor", min_value=0.1, max_value=1.0, value=0.7)
+            tracking_confidence = None
+            max_num_faces = None
+        elif detection_type == "MEDIAPIPE":
+            max_num_faces = st.number_input("Maximum Number of Faces", value=2, min_value=1)
+            detection_scale_factor = None
+            detection_min_face_size = None
+            tracking_confidence = st.slider("Min Tracking Confidence", min_value=0.0, max_value=1.0, value=0.9)
+        detection_confidence = st.slider("Min Detection Confidence", min_value=0.0, max_value=1.0, value=0.9)
+
         st.markdown("---")
         st.markdown("## Face Recognition")
         similarity_threshold = st.slider("Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67)
         st.markdown(
             "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
         )
-        model_name = st.selectbox("Model", ["FaceTransformerONNX", "MobileNetV2ONNX", "MobileNetV2", "ResNet50", "ArcFaceOctupletLoss", "FaceTransformerOctupletLoss"], index=0)
+        model_name = st.selectbox("Model", ["FaceTransformerOctupletLossONNX", "MobileNetV2ONNX", "MobileNetV2", "ResNet50", "ArcFaceOctupletLoss", "FaceTransformerOctupletLoss"], index=2)
         st.markdown(
             "Note: The mobileNet model is smaller and faster, but less accurate. The resNet model is bigger and slower, but more accurate."
         )
@@ -86,6 +97,9 @@ gallery = init_gallery(
 )
 
 face_detector = FaceDetection(
+    model_name=detection_type,
+    min_tracking_confidence=tracking_confidence,
+    max_num_faces=max_num_faces,
     min_detections_conf=detection_confidence,
     min_face_size=detection_min_face_size,
     scale_factor=detection_scale_factor,

@@ -16,3 +16,4 @@ vit_pytorch
 torchvision
 torch
 onnxruntime
+mediapipe

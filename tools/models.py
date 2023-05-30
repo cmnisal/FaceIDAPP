@@ -175,7 +175,7 @@ class MobileNetV2ONNX(ONNXModel):
         return self._inference(self.sess, imgs)
 
 
-class FaceTransformerONNX(ONNXModel):
+class FaceTransformerOctupletLossONNX(ONNXModel):
     def __init__(self) -> None:
         self.sess = rt.InferenceSession(get_file(URLS["FaceTransformerOctupletLossONNX"], FILE_HASHES["FaceTransformerOctupletLossONNX"]), providers=rt.get_available_providers())
 

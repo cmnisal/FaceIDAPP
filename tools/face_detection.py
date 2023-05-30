@@ -1,8 +1,7 @@
 import cv2
 import numpy as np
 from .nametypes import Detection
-from tools.models import MTCNN
-import time
+from typing import Literal
 
 
 class StageStatus:
@@ -36,6 +35,9 @@ class FaceDetection:
         steps_threshold: list = None,
         scale_factor: float = 0.7,
         min_detections_conf: float = 0.9,
+        min_tracking_confidence: float = 0.9,
+        max_num_faces: int = 2,
+        model_name: Literal["MTCNN", "MEDIAPIPE"] = "MTCNN",
     ):
         """
         Initializes the MTCNN.
@@ -49,7 +51,20 @@ class FaceDetection:
         self._steps_threshold = steps_threshold
         self._scale_factor = scale_factor
         self.min_detections_conf = min_detections_conf
-        self.model = MTCNN()
+        self.model_type = model_name
+        if model_name == "MTCNN":
+            from tools.models import MTCNN
+            self.model = MTCNN()
+        elif model_name == "MEDIAPIPE":
+            from mediapipe import solutions as sl
+            self.model = sl.face_mesh.FaceMesh(
+                refine_landmarks=True,
+                max_num_faces=max_num_faces,
+                min_detection_confidence=min_detections_conf,
+                min_tracking_confidence=min_tracking_confidence,
+            )
+        else:
+            raise ValueError(f"model must be one of ['MTCNN', 'MEDIAPIPE'], got {model_name}")
 
     def __call__(self, frame):
         """
@@ -67,41 +82,85 @@ class FaceDetection:
         # 2. dim -> x1, x2, x3, x4, x5, y2, y2, y3, y4, y5 Coordinates
         """
 
-        height, width, _ = frame.shape
-        stage_status = StageStatus(width=width, height=height)
-        m = 12 / self._min_face_size
-        min_layer = np.amin([height, width]) * m
-        scales = self.__compute_scale_pyramid(m, min_layer)
+        if self.model_type == "MTCNN":
+            height, width, _ = frame.shape
+            stage_status = StageStatus(width=width, height=height)
+            m = 12 / self._min_face_size
+            min_layer = np.amin([height, width]) * m
+            scales = self.__compute_scale_pyramid(m, min_layer)
 
-        start = time.time()
+            # We pipe here each of the stages
+            total_boxes, stage_status = self.__stage1(frame, scales, stage_status)
+            total_boxes, stage_status = self.__stage2(frame, total_boxes, stage_status)
+            bboxes, points = self.__stage3(frame, total_boxes, stage_status)
 
-        # We pipe here each of the stages
-        total_boxes, stage_status = self.__stage1(frame, scales, stage_status)
-        total_boxes, stage_status = self.__stage2(frame, total_boxes, stage_status)
-        bboxes, points = self.__stage3(frame, total_boxes, stage_status)
+            # Sort by location (to prevent flickering)
+            sort_idx = np.argsort(bboxes[:, 0])
+            bboxes = bboxes[sort_idx]
+            points = points[sort_idx]
 
-        # Sort by location (to prevent flickering)
-        sort_idx = np.argsort(bboxes[:, 0])
-        bboxes = bboxes[sort_idx]
-        points = points[sort_idx]
+            # Transform to better shape and points now inside bbox
+            detections = []
+            cnt = 0
+            for i in range(bboxes.shape[0]):
+                conf = bboxes[i, -1].astype(np.float32)
+                if conf > self.min_detections_conf:
+                    bboxes_c = np.reshape(bboxes[i, :-1], [2, 2]).astype(np.float32)
+                    points_c = np.reshape(points[i], [2, 5]).transpose().astype(np.float32)
 
-        # Transform to better shape and points now inside bbox
-        detections = []
-        cnt = 0
-        for i in range(bboxes.shape[0]):
-            conf = bboxes[i, -1].astype(np.float32)
-            if conf > self.min_detections_conf:
-                bboxes_c = np.reshape(bboxes[i, :-1], [2, 2]).astype(np.float32)
-                points_c = np.reshape(points[i], [2, 5]).transpose().astype(np.float32)
-                detections.append(
-                    Detection(
-                        idx=cnt,
-                        bbox=list(bboxes_c),
-                        landmarks=list(points_c),
-                        confidence=conf,
+                    detections.append(
+                        Detection(
+                            idx=cnt,
+                            bbox=list(bboxes_c),
+                            landmarks=list(points_c),
+                            confidence=conf,
+                        )
                     )
-                )
-                cnt += 1
+                    cnt += 1
+        elif self.model_type == "MEDIAPIPE":
+            # Process the frame with MediaPipe Face Mesh
+
+            results = self.model.process(frame)
+
+            # Get the Bounding Boxes from the detected faces
+            detections = []
+            if results.multi_face_landmarks:
+                for cnt, landmarks in enumerate(results.multi_face_landmarks):
+                    x_coords = [
+                        landmark.x * frame.shape[1] for idx, landmark in enumerate(landmarks.landmark) if idx in [470, 475, 1, 57, 287]
+                    ]
+                    y_coords = [
+                        landmark.y * frame.shape[0] for idx, landmark in enumerate(landmarks.landmark) if idx in [470, 475, 1, 57, 287]
+                    ]
+
+                    points_c = np.array([x_coords, y_coords]).transpose().astype(np.float32)
+
+
+                    x_coords = [
+                        landmark.x * frame.shape[1] for landmark in landmarks.landmark
+                    ]
+                    y_coords = [
+                        landmark.y * frame.shape[0] for landmark in landmarks.landmark
+                    ]
+
+                    x_min, x_max = int(min(x_coords)), int(max(x_coords))
+                    y_min, y_max = int(min(y_coords)), int(max(y_coords))
+
+                    bboxes_c = np.array([[x_min, y_min], [x_max, y_max]]).astype(np.float32)
+                    
+                    conf = None
+
+                    detections.append(
+                        Detection(
+                            idx=cnt,
+                            bbox=list(bboxes_c),
+                            landmarks=list(points_c),
+                            confidence=conf,
+                        )
+                    )
+        else:
+            raise ValueError(f"model must be one of ['MTCNN', 'Mediapipe'], got {self.model_type}")
+        
         return frame, detections
 
     def __compute_scale_pyramid(self, m, min_layer):

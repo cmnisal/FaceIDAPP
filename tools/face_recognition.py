@@ -10,7 +10,7 @@ class FaceRecognition:
     def __init__(
         self,
         min_similarity: float = 0.67,
-        model_name: Literal["mobileNet", "resNet50"] = "mobileNet",
+        model_name: Literal["MobileNetV2", "ResNet50", "ArcFaceOctupletLoss", "FaceTransformerOctupletLoss", "MobileNetV2ONNX","FaceTransformerOctupletLossONNX"] = "MobileNetV2",
     ):
         
         # TODO move imports to top, when running
@@ -30,12 +30,12 @@ class FaceRecognition:
         elif model_name == "MobileNetV2ONNX":
             from .models import MobileNetV2ONNX
             self.model = MobileNetV2ONNX()
-        elif model_name == "FaceTransformerONNX":
-            from .models import FaceTransformerONNX
-            self.model = FaceTransformerONNX()
+        elif model_name == "FaceTransformerOctupletLossONNX":
+            from .models import FaceTransformerOctupletLossONNX
+            self.model = FaceTransformerOctupletLossONNX()
         else:
             raise ValueError(
-                f"model_name must be one of ['FaceTransformerONNX', 'MobileNetV2ONNX', 'MobileNetV2', 'ResNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
+                f"model_name must be one of ['FaceTransformerOctupletLossONNX', 'MobileNetV2ONNX', 'MobileNetV2', 'ResNet50', 'ArcFaceOctupletLoss', 'FaceTransformerOctupletLoss'], got {model_name}"
             )
 
 
