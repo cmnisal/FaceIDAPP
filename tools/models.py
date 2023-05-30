@@ -66,7 +66,6 @@ class PTModel:
 class FaceTransformerOctupletLoss(PTModel):
     def __init__(self, batch_size=32) -> None:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {self.device}")
         self.model = ViT_face(
             loss_type="CosFace",
             GPU_ID=self.device,
