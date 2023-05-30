@@ -14,8 +14,10 @@ URLS = {
     "r_net": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/r_net.tflite",
     "MobileNetV2": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/mobileNet.tflite",
     "ResNet50": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/resNet.tflite",
-    "FaceTransformerOctupletLoss": "https://github.com/Martlgap/FaceIDAPP/releases/download/untagged-0646165ee2e1ac8d6b29/FaceTransformerOctupletLoss.pt",
-    "ArcFaceOctupletLoss": "https://github.com/Martlgap/octuplet-loss/releases/download/modelweights/ArcFaceOctupletLoss.tf.zip",
+    "FaceTransformerOctupletLossONNX": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/FaceTransformerOctupletLoss.onnx",
+    "MobileNetV2ONNX": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/MobileNetV2.onnx",
+    "FaceTransformerOctupletLossPT": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/FaceTransformerOctupletLoss.pt",
+    "ArcFaceOctupletLossTF": "https://github.com/Martlgap/octuplet-loss/releases/download/modelweights/ArcFaceOctupletLoss.tf.zip",
 }
 
 FILE_HASHES = {
@@ -24,8 +26,10 @@ FILE_HASHES = {
     "r_net": "5ec33b065eb2802bc4c2575d21feff1a56958d854785bc3e2907d3b7ace861a2",
     "MobileNetV2": "6c19b789f661caa8da735566490bfd8895beffb2a1ec97a56b126f0539991aa6",
     "ResNet50": "f4d8b0194957a3ad766135505fc70a91343660151a8103bbb6c3b8ac34dbb4e2",
-    "FaceTransformerOctupletLoss": "f2c7cf1b074ecb17e546dc7043a835ad6944a56045c9675e8e1158817d662662",
-    "ArcFaceOctupletLoss": "8603f374fd385081ce5ce80f5997e3363f4247c8bbad0b8de7fb26a80468eeea",
+    "FaceTransformerOctupletLossPT": "b10faa1c170b9fd0f95e3142d9e584ad6f9647d3566207d8bfcc259df8dbdf0f",
+    "ArcFaceOctupletLossTF": "8603f374fd385081ce5ce80f5997e3363f4247c8bbad0b8de7fb26a80468eeea",
+    "FaceTransformerOctupletLossONNX": "aa995cce8b137ccdc65b394cc57c6b1fdafc7012ce5197e62a4cf8d8e61db4f2",
+    "MobileNetV2ONNX": "6f53fb10f0db558403f73cfe744a96b12d763bdf1294a38d14ef14307d61ecf3",
 }
 
 
@@ -37,7 +41,7 @@ class TFModel:
 class ArcFaceOctupletLoss(TFModel):
     def __init__(self, batch_size=32):
         self.model = tf.keras.models.load_model(
-            get_file(URLS["ArcFaceOctupletLoss"], FILE_HASHES["ArcFaceOctupletLoss"])
+            get_file(URLS["ArcFaceOctupletLossTF"], FILE_HASHES["ArcFaceOctupletLossTF"])
         )
         self.batch_size = batch_size
 
@@ -77,7 +81,7 @@ class FaceTransformerOctupletLoss(PTModel):
         )
         self.model.load_state_dict(
             torch.load(
-                get_file(URLS["FaceTransformerOctupletLoss"], FILE_HASHES["FaceTransformerOctupletLoss"]),
+                get_file(URLS["FaceTransformerOctupletLossPT"], FILE_HASHES["FaceTransformerOctupletLossPT"]),
                 map_location=self.device,
             )
         )
@@ -164,7 +168,7 @@ class ONNXModel:
 
 class MobileNetV2ONNX(ONNXModel):
     def __init__(self) -> None:
-        self.sess = rt.InferenceSession("./mobileNet.onnx", providers=rt.get_available_providers())
+        self.sess = rt.InferenceSession(get_file(URLS["MobileNetV2ONNX"], FILE_HASHES["MobileNetV2ONNX"]), providers=rt.get_available_providers())
 
     # TODO somehow show if CPU or GPU is used?
     def __call__(self, imgs):
@@ -173,7 +177,7 @@ class MobileNetV2ONNX(ONNXModel):
 
 class FaceTransformerONNX(ONNXModel):
     def __init__(self) -> None:
-        self.sess = rt.InferenceSession("./FaceTransformerOctupletLoss.onnx", providers=rt.get_available_providers())
+        self.sess = rt.InferenceSession(get_file(URLS["FaceTransformerOctupletLossONNX"], FILE_HASHES["FaceTransformerOctupletLossONNX"]), providers=rt.get_available_providers())
 
     def __call__(self, imgs):
         imgs = (np.transpose(imgs, [0, 3, 1, 2]) * 255.0).clip(0.0, 255.0)
