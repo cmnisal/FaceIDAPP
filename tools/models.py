@@ -60,6 +60,8 @@ class ArcFaceOctupletLoss(TFModel):
 
 class PTModel:
     def _inference(self, img) -> np.ndarray:
+        if self.device.type == "cuda":
+            img = img.cuda()
         return self.model(img).cpu().detach().numpy()
 
 
