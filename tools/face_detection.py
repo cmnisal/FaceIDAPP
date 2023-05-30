@@ -80,8 +80,6 @@ class FaceDetection:
         total_boxes, stage_status = self.__stage2(frame, total_boxes, stage_status)
         bboxes, points = self.__stage3(frame, total_boxes, stage_status)
 
-        print("Time: {:.3f} ms".format((time.time() - start) * 1000))
-
         # Sort by location (to prevent flickering)
         sort_idx = np.argsort(bboxes[:, 0])
         bboxes = bboxes[sort_idx]

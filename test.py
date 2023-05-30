@@ -18,24 +18,24 @@ FILE_HASHES = {
 filename = get_file(URLS["FaceTransformerOctupletLoss"], FILE_HASHES["FaceTransformerOctupletLoss"])
 model = torch.load(filename)
 
-torch.save(model.state_dict(), "model-weights.pt")
-# from tools.vit_face import ViT_face
+torch.save(model.state_dict(), "FaceTransformerOctupletLoss.pt")
+from tools.vit_face import ViT_face
 
-# model = ViT_face(
-#     loss_type = "CosFace",
-#     GPU_ID = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-#     num_class = 93431,
-#     image_size=112,
-#     patch_size=8,
-#     dim=512,
-#     depth=20,
-#     heads=8,
-#     mlp_dim=2048,
-#     dropout=0.1,
-#     emb_dropout=0.1
-# )
-# model.load_state_dict(torch.load("model-weights.pt"))
-# model.eval()
+model = ViT_face(
+    loss_type = "CosFace",
+    GPU_ID = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    num_class = 93431,
+    image_size=112,
+    patch_size=8,
+    dim=512,
+    depth=20,
+    heads=8,
+    mlp_dim=2048,
+    dropout=0.1,
+    emb_dropout=0.1
+)
+model.load_state_dict(torch.load("FaceTransformerOctupletLoss.pt"))
+model.eval()
 
 # print(1)
 
