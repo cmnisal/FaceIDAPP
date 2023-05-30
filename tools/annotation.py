@@ -31,6 +31,21 @@ class Annotation:
                         (255, 255, 255),
                         -1,
                     )
+                
+                # # Draw Numbers for Landmarks
+                # for i, landmark in enumerate(detection.landmarks):
+                #     cv2.putText(
+                #         frame,
+                #         str(i),
+                #         (
+                #             ((landmark[0] + 2) * upscale_factor[0]).astype(int),
+                #             ((landmark[1] + 2) * upscale_factor[1]).astype(int),
+                #         ),
+                #         cv2.LINE_AA,
+                #         0.5,
+                #         (255, 255, 0),
+                #         2,
+                #     )
 
             # Draw Bounding Box
             if self.bbox:

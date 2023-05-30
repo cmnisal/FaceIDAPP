@@ -126,15 +126,15 @@ class FaceDetection:
             detections = []
             if results.multi_face_landmarks:
                 for cnt, landmarks in enumerate(results.multi_face_landmarks):
-                    x_coords = [
+                    sortidx = [3, 4, 0, 1, 2]
+                    x_coords = np.asarray([
                         landmark.x * frame.shape[1] for idx, landmark in enumerate(landmarks.landmark) if idx in [470, 475, 1, 57, 287]
-                    ]
-                    y_coords = [
+                    ])[sortidx]
+                    y_coords = np.asarray([
                         landmark.y * frame.shape[0] for idx, landmark in enumerate(landmarks.landmark) if idx in [470, 475, 1, 57, 287]
-                    ]
+                    ])[sortidx]
 
                     points_c = np.array([x_coords, y_coords]).transpose().astype(np.float32)
-
 
                     x_coords = [
                         landmark.x * frame.shape[1] for landmark in landmarks.landmark
@@ -147,7 +147,7 @@ class FaceDetection:
                     y_min, y_max = int(min(y_coords)), int(max(y_coords))
 
                     bboxes_c = np.array([[x_min, y_min], [x_max, y_max]]).astype(np.float32)
-                    
+
                     conf = None
 
                     detections.append(
@@ -159,7 +159,7 @@ class FaceDetection:
                         )
                     )
         else:
-            raise ValueError(f"model must be one of ['MTCNN', 'Mediapipe'], got {self.model_type}")
+            raise ValueError(f"model must be one of ['MTCNN', 'MEDIAPIPE'], got {self.model_type}")
         
         return frame, detections
 
