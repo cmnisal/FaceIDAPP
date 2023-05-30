@@ -60,10 +60,7 @@ class ArcFaceOctupletLoss(TFModel):
 
 class PTModel:
     def _inference(self, img) -> np.ndarray:
-        print(self.device.type)
-        if self.device.type == "cuda":
-            img = img.cuda()
-        return self.model(img).cpu().detach().numpy()
+        return self.model(img.to(self.device)).cpu().detach().numpy()
 
 
 class FaceTransformerOctupletLoss(PTModel):
@@ -89,6 +86,7 @@ class FaceTransformerOctupletLoss(PTModel):
                 map_location=self.device,
             )
         )
+        self.model = self.model.to(self.device)
         self.model.eval()
         self.batch_size = batch_size
 
