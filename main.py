@@ -109,8 +109,15 @@ annotator = Annotation()
 
 transfer_queue: "queue.Queue[Stats, List[Detection], List[Identity], List[Match]]" = queue.Queue()
 
+# frame_cnt = 0
 
 def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+    # global frame_cnt
+    # frame_cnt += 1
+
+    # if frame_cnt % 4 != 0:
+    #     return frame
+
     # Initialize detections
     detections, identities, matches = [], [], []
 
