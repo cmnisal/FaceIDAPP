@@ -2,78 +2,75 @@ import streamlit as st
 import time
 from typing import List
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
-import logging
 import av
+import numpy as np
 import queue
-from streamlit_toggle import st_toggle_switch
+import onnxruntime as rt
 import pandas as pd
-from tools.nametypes import Stats, Detection, Identity, Match
-from tools.utils import get_ice_servers, rgb, format_dflist
-from tools.face_detection import FaceDetection
-from tools.face_recognition import FaceRecognition
-from tools.annotation import Annotation
-from tools.gallery import init_gallery
-from tools.pca import pca
+import threading
+from tools.utils import format_dflist
+import mediapipe as mp
+import os
+from twilio.rest import Client
+import cv2
+from skimage.transform import SimilarityTransform
+from types import SimpleNamespace
+from sklearn.metrics.pairwise import cosine_distances
+from streamlit_profiler import Profiler
 
 
-# Set logging level to error (To avoid getting spammed by queue warnings etc.)
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.ERROR)
+class Stats(SimpleNamespace):
+    fps: float = None
+    num_faces: int = 0
+    detection: float = None
+    recognition: float = None
+    matching: float = None
+    annotation: float = None
 
+
+class Detection(SimpleNamespace):
+    bbox: List[List[float]] = None
+    landmarks: List[List[float]] = None
+
+
+class Identity(SimpleNamespace):
+    detection: Detection = Detection()
+    name: str = None
+    embedding: np.ndarray = None
+    face: np.ndarray = None
+
+
+class Match(SimpleNamespace):
+    subject_id: Identity = Identity()
+    gallery_id: Identity = Identity()
+    distance: float = None
+    name: str = None
+
+
+# Get twilio ice server configuration using twilio credentials from environment variables (set in streamlit secrets)
+# Ref: https://www.twilio.com/docs/stun-turn/api
+# ICE_SERVERS = Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"]).tokens.create().ice_servers
 
 # Set page layout for streamlit to wide
-st.set_page_config(layout="wide", page_title="FaceID App Demo", page_icon=":sunglasses:")
+st.set_page_config(layout="wide", page_title="Live Face Recognition", page_icon=":sunglasses:")
+
+# Sidebar with settings and face gallery
 with st.sidebar:
     st.markdown("# Settings")
-    face_rec_on = st_toggle_switch(
-        "Live Face Recognition",
-        key="activate_face_rec",
-        default_value=True,
-        active_color=rgb(255, 75, 75),
-        track_color=rgb(50, 50, 50),
-        label_after=True,
+    st.markdown("---")
+    st.markdown("## Face Detection")
+    max_num_faces = st.number_input("Maximum Number of Faces", value=2, min_value=1)
+    min_tracking_confidence = st.slider("Min Tracking Confidence", min_value=0.0, max_value=1.0, value=0.9)
+    min_detection_confidence = st.slider("Min Detection Confidence", min_value=0.0, max_value=1.0, value=0.9)
+
+    st.markdown("---")
+    st.markdown("## Face Recognition")
+    similarity_threshold = st.slider("Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67)
+    st.markdown(
+        "Maximum distance between the subject and the closest gallery face embeddings for considering them as a match."
     )
 
-    with st.expander("Advanced Settings", expanded=False):
-        st.markdown("## Webcam & Stream")
-        resolution = st.selectbox(
-            "Webcam Resolution",
-            [(1920, 1080), (1280, 720), (640, 360)],
-            index=2,
-        )
-        st.markdown("Note: To change the resolution, you have to restart the stream.")
-
-        ice_server = st.selectbox("ICE Server", ["twilio", "metered", "local"], index=2)
-        st.markdown(
-            "Note: metered is a free server with limited bandwidth, and can take a while to connect. Twilio is a paid service and is payed by me, so please don't abuse it."
-        )
-        st.markdown("---")
-        st.markdown("## Face Detection")
-        detection_type = st.selectbox("Detection Type", ["MTCNN", "MEDIAPIPE"], index=1)
-
-        if detection_type == "MTCNN":
-            detection_min_face_size = st.slider("Min Face Size", min_value=5, max_value=120, value=40)
-            detection_scale_factor = st.slider("Scale Factor", min_value=0.1, max_value=1.0, value=0.7)
-            tracking_confidence = None
-            max_num_faces = None
-        elif detection_type == "MEDIAPIPE":
-            max_num_faces = st.number_input("Maximum Number of Faces", value=2, min_value=1)
-            detection_scale_factor = None
-            detection_min_face_size = None
-            tracking_confidence = st.slider("Min Tracking Confidence", min_value=0.0, max_value=1.0, value=0.9)
-        detection_confidence = st.slider("Min Detection Confidence", min_value=0.0, max_value=1.0, value=0.9)
-
-        st.markdown("---")
-        st.markdown("## Face Recognition")
-        similarity_threshold = st.slider("Similarity Threshold", min_value=0.0, max_value=2.0, value=0.67)
-        st.markdown(
-            "This sets a maximum distance for the cosine similarity between the embeddings of the detected face and the gallery images. If the distance is below the threshold, the face is recognized as the gallery image with the lowest distance. If the distance is above the threshold, the face is not recognized."
-        )
-        model_name = st.selectbox("Model", ["FaceTransformerOctupletLossONNX", "MobileNetV2ONNX", "MobileNetV2", "ResNet50", "ArcFaceOctupletLoss", "FaceTransformerOctupletLoss"], index=2)
-        st.markdown(
-            "Note: The mobileNet model is smaller and faster, but less accurate. The resNet model is bigger and slower, but more accurate."
-        )
-
+    st.markdown("---")
     st.markdown("# Face Gallery")
     files = st.sidebar.file_uploader(
         "Upload images to gallery",
@@ -82,234 +79,393 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    with st.expander("Uploaded Images", expanded=True):
-        if files:
-            st.image(files, width=112, caption=files)
-        else:
-            st.info("No images uploaded yet.")
-
-
-gallery = init_gallery(
-    files,
-    min_detections_conf=detection_confidence,
-    min_similarity=similarity_threshold,
-    model_name=model_name,
-)
-
-face_detector = FaceDetection(
-    model_name=detection_type,
-    min_tracking_confidence=tracking_confidence,
-    max_num_faces=max_num_faces,
-    min_detections_conf=detection_confidence,
-    min_face_size=detection_min_face_size,
-    scale_factor=detection_scale_factor,
-)
-face_recognizer = FaceRecognition(model_name=model_name, min_similarity=similarity_threshold)
-annotator = Annotation()
-
-transfer_queue: "queue.Queue[Stats, List[Detection], List[Identity], List[Match]]" = queue.Queue()
-
-# frame_cnt = 0
-
-def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
-    # global frame_cnt
-    # frame_cnt += 1
-
-    # if frame_cnt % 4 != 0:
-    #     return frame
-
-    # Initialize detections
-    detections, identities, matches = [], [], []
-
-    # Initialize stats
-    stats = Stats()
-
-    # Start timer for FPS calculation
-    frame_start = time.time()
-
-    # Convert frame to numpy array
-    frame = frame.to_ndarray(format="rgb24")
-
-    # Get frame resolution and add to stats
-    resolution = frame.shape
-    stats = stats._replace(resolution=resolution)
-
-    if face_rec_on:
-        # Run face detection
-        start = time.time()
-        frame, detections = face_detector(frame)
-        stats = stats._replace(num_faces=len(detections) if detections else 0)
-        stats = stats._replace(detection=(time.time() - start) * 1000)
-
-        # Run face recognition
-        start = time.time()
-        identities = face_recognizer(frame, detections)
-        stats = stats._replace(recognition=(time.time() - start) * 1000)
-
-        # Do matching
-        start = time.time()
-        matches = face_recognizer.find_matches(identities, gallery)
-        stats = stats._replace(matching=(time.time() - start) * 1000)
-
-        # Draw annotations
-        start = time.time()
-        frame = annotator(frame, detections, identities, matches, gallery)
-        stats = stats._replace(annotation=(time.time() - start) * 1000)
-
-    # Convert frame back to av.VideoFrame
-    frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
-
-    # Calculate FPS and add to stats
-    stats = stats._replace(fps=1 / (time.time() - frame_start))
-
-    # Send data to other thread
-    transfer_queue.put_nowait([stats, detections, identities, matches])
-
-    return frame
-
-
 # Streamlit app
 st.title("Live Webcam Face Recognition")
 
 st.markdown("**Stream Stats**")
 disp_stats = st.info("No streaming statistics yet, please start the stream.")
 
-ctx = webrtc_streamer(
-    key="FaceIDAppDemo",
-    mode=WebRtcMode.SENDRECV,
-    rtc_configuration={"iceServers": get_ice_servers(name=ice_server)},
-    video_frame_callback=video_frame_callback,
-    media_stream_constraints={
-        "video": {
-            "width": {
-                "min": resolution[0],
-                "ideal": resolution[0],
-                "max": resolution[0],
-            },
-            "height": {
-                "min": resolution[1],
-                "ideal": resolution[1],
-                "max": resolution[1],
-            },
-        },
-        "audio": False,
-    },
-    async_processing=True,
+st.markdown("**Live Stream**")
+disp_stream = st.container()
+stream_window = st.empty()
+
+col1, col2 = st.columns(2)
+col1.markdown("**Gallery Faces**")
+disp_gallery = col1.info("No gallery images uploaded yet ...")
+
+col2.markdown("**Matches**")
+disp_matches = col2.info("No matches found yet ...")
+
+
+# Init face detector and face recognizer
+face_recognizer = rt.InferenceSession("model.onnx", providers=rt.get_available_providers())
+face_detector = mp.solutions.face_mesh.FaceMesh(
+    refine_landmarks=True,
+    min_detection_confidence=min_detection_confidence,
+    min_tracking_confidence=min_tracking_confidence,
+    max_num_faces=max_num_faces,
 )
 
-tab_recognition, tab_metrics, tab_pca = st.tabs(["Recognized Identities", "Recognition Metrics", "Live PCAs"])
+
+def detect_faces(frame):
+    # Process the frame with the face detector
+    result = face_detector.process(frame)
+
+    # Initialize an empty list to store the detected faces
+    detections = []
+
+    # Check if any faces were detected
+    if result.multi_face_landmarks:
+        # Iterate over each detected face
+        for count, detection in enumerate(result.multi_face_landmarks):
+
+            # Select 5 Landmarks
+            five_landmarks = np.asarray(detection.landmark)[[470, 475, 1, 57, 287]]
 
 
-with tab_recognition:
-    # Display Gallery and Recognized Identities
-    col1, col2 = st.columns(2)
-    col1.markdown("**Gallery Identities**")
-    disp_identities_gal = col1.info("No gallery images uploaded yet ...")
-    col2.markdown("**Recognized Identities**")
-    disp_identities_rec = col2.info("No recognized identities yet ...")
+            # Extract the x and y coordinates of the landmarks of interest
+            landmarks = [[landmark.x * frame.shape[1], landmark.y * frame.shape[0]] for landmark in five_landmarks]
 
-with tab_metrics:
-    # Display Detections and Identities
-    st.markdown("**Detection Metrics**")
-    disp_detection_metrics = st.info("No detected faces yet ...")
+            # Extract the x and y coordinates of all landmarks
+            all_x_coords = [landmark.x * frame.shape[1] for landmark in detection.landmark]
+            all_y_coords = [landmark.y * frame.shape[0] for landmark in detection.landmark]
 
-    # Display Recognition Metrics
-    st.markdown("**Recognition Metrics**")
-    disp_recognition_metrics = st.info("No recognized identities yet ...")
+            # Compute the bounding box of the face
+            x_min, x_max = int(min(all_x_coords)), int(max(all_x_coords))
+            y_min, y_max = int(min(all_y_coords)), int(max(all_y_coords))
+            bbox = [[x_min, y_min], [x_max, y_max]]
 
-with tab_pca:
-    # Display 2D and 3D PCA
-    col1, col2 = st.columns(2)
-    col1.markdown("**PCA 2D**")
-    disp_pca3d = col1.info("Only available if more than 1 recognized face ...")
-    col2.markdown("**PCA 3D**")
-    disp_pca2d = col2.info("Only available if more than 1 recognized face ...")
-    freeze_pcas = st.button("Freeze PCAs for Interaction", key="reset_pca")
-
-    # Show PCAs
-    if freeze_pcas and gallery:
-        col1, col2 = st.columns(2)
-        if len(st.session_state.matches) > 1:
-            col1.plotly_chart(
-                pca(
-                    st.session_state.matches,
-                    st.session_state.identities,
-                    gallery,
-                    dim=3,
-                ),
-                use_container_width=True,
+            # Create a Detection object for the face
+            detection = Detection(
+                idx=count,
+                bbox=bbox,
+                landmarks=landmarks,
+                confidence=None,
             )
-            col2.plotly_chart(
-                pca(
-                    st.session_state.matches,
-                    st.session_state.identities,
-                    gallery,
-                    dim=2,
-                ),
-                use_container_width=True,
+
+            # Add the detection to the list
+            detections.append(detection)
+
+    # Return the list of detections
+    return detections
+
+
+def recognize_faces(frame, detections):
+
+    if not detections:
+        return []
+
+    # Align faces
+    faces_aligned = []
+    for detection in detections:
+        # Crop image to face bounding box
+        face = frame[
+            int(detection.bbox[0][1]) : int(detection.bbox[1][1]),
+            int(detection.bbox[0][0]) : int(detection.bbox[1][0]),
+        ]
+
+        # Transform landmark coordinates to face bounding box coordinates
+        landmarks_source = np.array(detection.landmarks)
+        landmarks_source[:, 0] -= detection.bbox[0][0]
+        landmarks_source[:, 1] -= detection.bbox[0][1]
+
+        # Target landmark coordinates (as used in training)
+        landmarks_target = np.array(
+            [
+                [38.2946, 51.6963],
+                [73.5318, 51.5014],
+                [56.0252, 71.7366],
+                [41.5493, 92.3655],
+                [70.7299, 92.2041],
+            ],
+            dtype=np.float32,
+        )
+        tform = SimilarityTransform()
+        tform.estimate(landmarks_source, landmarks_target)
+        tmatrix = tform.params[0:2, :]
+        face_aligned = cv2.warpAffine(face, tmatrix, (112, 112), borderValue=0.0)
+        faces_aligned.append(face_aligned)
+
+    # Inference face embeddings with onnxruntime
+    embeddings = face_recognizer.run(None, {"input_image": np.asarray(faces_aligned).astype(np.float32)})[0]
+    
+    # Create Identity objects
+    identities = []
+    for idx, detection in enumerate(detections):
+        identities.append(
+            Identity(
+                idx=idx,
+                detection=detection,
+                embedding=embeddings[idx],
+                face=faces_aligned[idx],
+                name=f"face-{idx}"
             )
+        )
+
+    return identities
+
+
+def match_faces(subjects, gallery):
+    if len(gallery) == 0 or len(subjects) == 0:
+        return []
+
+    # Get Embeddings
+    embs_gal = np.asarray([identity.embedding for identity in gallery])
+    embs_det = np.asarray([identity.embedding for identity in subjects])
+
+    # Calculate Cosine Distances
+    cos_distances = cosine_distances(embs_det, embs_gal)
+
+    # Find Matches
+    matches = []
+    for ident_idx, identity in enumerate(subjects):
+        dist_to_identity = cos_distances[ident_idx]
+        idx_min = np.argmin(dist_to_identity)
+        if dist_to_identity[idx_min] < similarity_threshold:
+            matches.append(
+                Match(
+                    subject_id=identity,
+                    gallery_id=gallery[idx_min],
+                    distance=dist_to_identity[idx_min],
+                )
+            )
+
+    # Sort Matches by identity_idx
+    matches = sorted(matches, key=lambda match: match.gallery_id.name)
+
+    return matches
+
+
+def draw_annotations(frame, detections, matches):
+    shape = np.asarray(frame.shape[:2][::-1])
+
+    # Upscale frame to 1080p for better visualization of drawn annotations
+    frame = cv2.resize(frame, (1920, 1080))
+    upscale_factor = np.asarray([1920 / shape[0], 1080 / shape[1]])
+    shape = np.asarray(frame.shape[:2][::-1])
+    
+    # Make frame writeable (for better performance)
+    frame.flags.writeable = True
+
+    # Draw Detections
+    for detection in detections:
+        # Draw Landmarks
+        for landmark in detection.landmarks:
+            cv2.circle(
+                frame,
+                (landmark * upscale_factor).astype(int),
+                2,
+                (255, 255, 255),
+                -1,
+            )
+
+        # Draw Bounding Box
+        cv2.rectangle(
+            frame,
+            (detection.bbox[0] * upscale_factor).astype(int),
+            (detection.bbox[1] * upscale_factor).astype(int),
+            (255, 0, 0),
+            2,
+        )
+
+        # Draw Index
+        cv2.putText(
+            frame,
+            str(detection.idx),
+            (
+                ((detection.bbox[1][0] + 2) * upscale_factor[0]).astype(int),
+                ((detection.bbox[1][1] + 2) * upscale_factor[1]).astype(int),
+            ),
+            cv2.LINE_AA,
+            0.5,
+            (0, 0, 0),
+            2,
+        )
+
+    # Draw Matches
+    for match in matches:
+        detection = match.subject_id.detection
+        name = match.gallery_id.name
+
+        # Draw Bounding Box in green
+        cv2.rectangle(
+            frame,
+            (detection.bbox[0] * upscale_factor).astype(int),
+            (detection.bbox[1] * upscale_factor).astype(int),
+            (0, 255, 0),
+            2,
+        )
+        
+        # Draw Banner
+        cv2.rectangle(
+            frame,
+            (
+                (detection.bbox[0][0] * upscale_factor[0]).astype(int),
+                (detection.bbox[0][1] * upscale_factor[1] - (shape[1] // 25)).astype(int),
+            ),
+            (
+                (detection.bbox[1][0] * upscale_factor[0]).astype(int),
+                (detection.bbox[0][1] * upscale_factor[1]).astype(int),
+            ),
+            (255, 255, 255),
+            -1,
+        )
+
+        # Draw Name
+        cv2.putText(
+            frame,
+            name,
+            (
+                ((detection.bbox[0][0] + shape[0] // 400) * upscale_factor[0]).astype(int),
+                ((detection.bbox[0][1] - shape[1] // 100) * upscale_factor[1]).astype(int),
+            ),
+            cv2.LINE_AA,
+            0.5,
+            (0, 0, 0),
+            2,
+        )
+
+    return frame
+
+
+# Init gallery
+gallery = []
+for file in files:
+    file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
+    img = cv2.cvtColor(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+    
+    # Face Detection
+    detections = detect_faces(img)
+
+    if detections:
+        # Face Recognition
+        subjects = recognize_faces(img, detections[:1])
+
+        # Add to gallery
+        gallery.append(
+            Identity(
+                name=os.path.splitext(file.name)[0],
+                embedding=subjects[0].embedding,
+                face=subjects[0].face,
+            )
+        )
+
+transfer_queue: "queue.Queue[Stats, List[Match]]" = queue.Queue()
+
+
+class Camera:
+    def __init__(self, video_receiver):
+        self.currentFrame = None
+        self.capture = video_receiver
+        self.stop = False
+        self.thread = threading.Thread(target=self.update_frame)
+        self.thread.daemon = True
+
+    def update_frame(self):
+        while True:
+            self.currentFrame = self.capture.get_frame()
+            if self.stop:
+                break
+
+    # Get current frame
+    def get_frame(self):
+        return self.currentFrame
+
+
+def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
+    # Convert frame to numpy array
+    frame = frame.to_ndarray(format="rgb24")
+
+    # Run face detection
+    start = time.time()
+    detections = detect_faces(frame)
+    num_faces = len(detections) if detections else 0
+    time_detection = (time.time() - start) * 1000
+
+    # Run face recognition
+    start = time.time()
+    subjects = recognize_faces(frame, detections)
+    time_recognition = (time.time() - start) * 1000
+
+    # Run face matching
+    start = time.time()
+    matches = match_faces(subjects, gallery)
+    time_matching = (time.time() - start) * 1000
+
+    # Draw annotations
+    start = time.time()
+    frame = draw_annotations(frame, detections, matches)
+    time_annotation = (time.time() - start) * 1000
+
+    # Convert frame back to av.VideoFrame
+    frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
+
+    stats = Stats(
+                num_faces=num_faces,
+                detection=time_detection,
+                recognition=time_recognition,
+                matching=time_matching,
+                annotation=time_annotation,
+            )
+
+    return frame, stats, matches
+
+with disp_stream:
+    print("start stream")
+    ctx = webrtc_streamer(
+        key="LiveFaceRecognition",
+        mode=WebRtcMode.SENDONLY,
+        #rtc_configuration={"iceServers": ICE_SERVERS},
+        #video_frame_callback=video_frame_callback,
+        media_stream_constraints={"video": 
+            {
+                "width": 1920,
+                #"height": 1080,
+                # "frameRate": 30,
+            }
+                                  , "audio": False},
+    )
 
 
 # Show Gallery Identities
 if gallery:
-    disp_identities_gal.image(
-        image=[identity.face_aligned for identity in gallery],
+    disp_gallery.image(
+        image=[identity.face for identity in gallery],
         caption=[match.name for match in gallery],
     )
-else:
-    disp_identities_gal.info("No gallery images uploaded yet ...")
+
+cam = Camera(ctx.video_receiver)
 
 
-# Display Live Stats
+
 if ctx.state.playing:
+    print("start thread")
+    cam.thread.start()
+    print("thread successfully started")
+    start = time.time()
     while True:
-        # Retrieve data from other thread
-        stats, detections, identities, matches = transfer_queue.get()
+        frame = cam.get_frame()
+        if frame is not None:
 
-        # Save for PCA Snapshot
-        st.session_state.identities = identities
-        st.session_state.matches = matches
+            frame, stats, matches = video_frame_callback(frame)
+            frame = frame.to_ndarray(format="rgb24")
+            
+            stream_window.image(frame, channels="RGB")
+            
+            # Show Stats
+            stats.fps = 1 / (time.time() - start)
+            start = time.time()
 
-        # Show Stats
-        disp_stats.dataframe(
-            pd.DataFrame([stats]).applymap(lambda x: (format_dflist(x))),
-            use_container_width=True,
-        )
-
-        # Show Detections Metrics
-        if detections:
-            disp_detection_metrics.dataframe(
-                pd.DataFrame(detections).applymap(lambda x: (format_dflist(x))),
+            disp_stats.dataframe(
+                pd.DataFrame([stats.__dict__]).applymap(lambda x: (format_dflist(x))),
                 use_container_width=True,
             )
-        else:
-            disp_detection_metrics.info("No detected faces yet ...")
 
-        # Show Match Metrics
-        if matches:
-            disp_recognition_metrics.dataframe(
-                pd.DataFrame(matches).applymap(lambda x: (format_dflist(x))),
-                use_container_width=True,
-            )
-        else:
-            disp_recognition_metrics.info("No recognized identities yet ...")
-
-        if len(matches) > 1:
-            disp_pca3d.plotly_chart(pca(matches, identities, gallery, dim=3), use_container_width=True)
-            disp_pca2d.plotly_chart(pca(matches, identities, gallery, dim=2), use_container_width=True)
-        else:
-            disp_pca3d.info("Only available if more than 1 recognized face ...")
-            disp_pca2d.info("Only available if more than 1 recognized face ...")
-
-        # Show Recognized Identities
-        if matches:
-            disp_identities_rec.image(
-                image=[identities[match.identity_idx].face_aligned for match in matches],
-                caption=[gallery[match.gallery_idx].name for match in matches],
-            )
-        else:
-            disp_identities_rec.info("No recognized identities yet ...")
-else:
-    st.info("Starting stream can take a while - if it's not working, switch to twilio servers for streaming in 'Advanced Settings' ...")
-
-# BUG Recognized Identity Image is not updating on cloud version? (works on local!!!)
+            # Show Matches
+            if matches:
+                disp_matches.image(
+                    image=[match.subject_id.face for match in matches],
+                    caption=[match.gallery_id.name for match in matches],
+                )
+            else:
+                disp_matches.info("No matches found yet ...")

@@ -1,42 +1,53 @@
-import torch
-from tools.utils import get_file
+import streamlit as st
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
+import time
+import threading
 
-URLS = {
-    "mobileNet": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/mobileNet.tflite",
-    "resNet": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/resNet.tflite",
-    "FaceTransformerOctupletLoss": "https://github.com/Martlgap/octuplet-loss/releases/download/modelweights/FaceTransformerOctupletLoss.pt",
-    "ArcFaceOctupletLoss": "https://github.com/Martlgap/octuplet-loss/releases/download/modelweights/ArcFaceOctupletLoss.tf.zip",
-}
 
-FILE_HASHES = {
-    "mobileNet": "6c19b789f661caa8da735566490bfd8895beffb2a1ec97a56b126f0539991aa6",
-    "resNet": "f4d8b0194957a3ad766135505fc70a91343660151a8103bbb6c3b8ac34dbb4e2",
-    "FaceTransformerOctupletLoss": "f2c7cf1b074ecb17e546dc7043a835ad6944a56045c9675e8e1158817d662662",
-    "ArcFaceOctupletLoss": "8603f374fd385081ce5ce80f5997e3363f4247c8bbad0b8de7fb26a80468eeea",
-}
+# Streamlit app
+st.title("FaceID App Demonstration")
 
-filename = get_file(URLS["FaceTransformerOctupletLoss"], FILE_HASHES["FaceTransformerOctupletLoss"])
-model = torch.load(filename)
+class Camera:
+    def __init__(self, video_receiver):
+        self.currentFrame = None
+        self.capture = video_receiver
+        self.thread = threading.Thread(target=self.update_frame)
+        #self.thread.start()
 
-torch.save(model.state_dict(), "FaceTransformerOctupletLoss.pt")
-from tools.vit_face import ViT_face
+    def update_frame(self):
+        while True:
+            self.currentFrame = self.capture.get_frame()
 
-model = ViT_face(
-    loss_type = "CosFace",
-    GPU_ID = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    num_class = 93431,
-    image_size=112,
-    patch_size=8,
-    dim=512,
-    depth=20,
-    heads=8,
-    mlp_dim=2048,
-    dropout=0.1,
-    emb_dropout=0.1
+    # Get current frame
+    def get_frame(self):
+        return self.currentFrame
+
+# Instantiate WebRTC (and show start button)
+ctx = webrtc_streamer(
+    key="FaceIDAppDemo",
+    mode=WebRtcMode.SENDONLY,
+    media_stream_constraints={"video": True, "audio": False},
+    on_video_ended=lambda: st.experimental_rerun(),
 )
-model.load_state_dict(torch.load("FaceTransformerOctupletLoss.pt"))
-model.eval()
 
-# print(1)
+# Live Stream Display
+image_loc = st.empty()
 
-# TODO make tf lite model from ArcFaceOctupletLoss and PTLite Model from FaceTransformerOctupletLoss!
+cam = Camera(ctx.video_receiver)
+
+if ctx.video_receiver:
+    cam.thread.start()
+    print("Video Receiver Found")
+    while True:
+        try:
+            frame = cam.get_frame()
+            img = frame.to_ndarray(format="rgb24")
+        except:
+            continue
+        
+        time.sleep(0.5)
+
+        # Display Live Frame
+        tmp = time.time()
+        image_loc.image(img)
+        print(f" Image Printing: {(time.time() - tmp) * 1000}", end="\r")
