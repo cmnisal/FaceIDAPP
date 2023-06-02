@@ -406,6 +406,7 @@ if ctx.state.playing:
             frame = frame.to_ndarray(format="rgb24")
 
             # Show Stream
+            print(np.max(frame))
             stream_container.image(frame, channels="RGB")
 
             # Show Matches
