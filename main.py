@@ -165,8 +165,6 @@ def match_faces(subjects: List[Identity], gallery: List[Identity]) -> List[Match
     embs_gal = np.asarray([identity.embedding for identity in gallery])
     embs_det = np.asarray([identity.embedding for identity in subjects])
 
-    print(embs_gal.shape)
-
     # Calculate Cosine Distances
     cos_distances = cosine_distances(embs_det, embs_gal)
 
@@ -395,6 +393,9 @@ if ctx.state.playing:
     while True:
         frame = grabber.get_frame()
         if frame is not None:
+            # Print frame timestamp to streamlit
+            st.write(f"Frame timestamp: {frame.time}")
+
             # Run face detection and recognition
             frame, matches = video_frame_callback(frame)
 
