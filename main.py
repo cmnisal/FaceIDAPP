@@ -403,7 +403,7 @@ if ctx.state.playing:
             frame = frame.to_ndarray(format="rgb24")
 
             # Print frame timestamp
-            info_container.write(f"Frame Maximum: {np.max(frame)}")
+            info_container.write(f"Frame Maximum: {np.mean(frame)}")
 
             # Show Stream
             stream_container.image(frame, channels="RGB")
