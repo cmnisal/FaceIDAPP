@@ -1,4 +1,4 @@
-streamlit
+streamlit==0.51.0
 scikit-image
 scikit-learn
 opencv-python-headless
