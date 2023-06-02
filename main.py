@@ -69,6 +69,9 @@ stream_container = st.empty()
 st.markdown("**Matches**")
 matches_container = st.info("No matches found yet ...")
 
+st.markdown("**Info**")
+info_container = st.empty()
+
 
 # Init face detector and face recognizer
 face_recognizer = rt.InferenceSession("model.fixed.onnx", providers=rt.get_available_providers())
@@ -393,8 +396,8 @@ if ctx.state.playing:
     while True:
         frame = grabber.get_frame()
         if frame is not None:
-            # Print frame timestamp to streamlit
-            st.write(f"Frame timestamp: {frame.time}")
+            # Print frame timestamp
+            info_container.write(f"Frame timestamp: {frame.time}")
 
             # Run face detection and recognition
             frame, matches = video_frame_callback(frame)
