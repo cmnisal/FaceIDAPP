@@ -397,7 +397,7 @@ if ctx.state.playing:
         frame = grabber.get_frame()
         if frame is not None:
             # Print frame timestamp
-            info_container.write(f"Frame timestamp: {frame.time}")
+            info_container.write(f"Frame Maximum: {np.max(frame)}")
 
             # Run face detection and recognition
             frame, matches = video_frame_callback(frame)
@@ -406,7 +406,6 @@ if ctx.state.playing:
             frame = frame.to_ndarray(format="rgb24")
 
             # Show Stream
-            print(np.max(frame))
             stream_container.image(frame, channels="RGB")
 
             # Show Matches
