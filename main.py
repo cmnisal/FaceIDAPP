@@ -13,9 +13,8 @@ import cv2
 from skimage.transform import SimilarityTransform
 from types import SimpleNamespace
 from sklearn.metrics.pairwise import cosine_distances
-"""FrameRate Calculation is not working, need to find a way to communicate between callback executions, to be able to set a current time and read it in the next execution. Also we have a severe lag in the video stream, need to find a way to improve it.
 
-"""
+# FrameRate Calculation is not working, need to find a way to communicate between callback executions, to be able to set a current time and read it in the next execution. Also we have a severe lag in the video stream, need to find a way to improve it.
 
 
 class Detection(SimpleNamespace):
