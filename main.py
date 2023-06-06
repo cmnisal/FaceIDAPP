@@ -51,7 +51,7 @@ stream_container = st.empty()
 # Start streaming component
 
 ctx = webrtc_streamer(
-    key="LiveFaceRecognition",
+    key="LiveFaceRecognitionSender",
     mode=WebRtcMode.SENDONLY,
     rtc_configuration={"iceServers": ICE_SERVERS},
     media_stream_constraints={"video": {"width": 1920}, "audio": False},
@@ -61,43 +61,28 @@ ctx = webrtc_streamer(
 grabber = Grabber(ctx.video_receiver)
 
 
-class ImageRenderingTrack(VideoStreamTrack):
+class VideoImageTrack(VideoStreamTrack):
     def __init__(self):
         super().__init__()
         self.queue = asyncio.Queue(10)
 
-    async def add_image(self, img: np.ndarray):
-        await self.queue.put(img)
+    def add_image(self, img: np.ndarray):
+        self.queue.put(img)
 
-    async def recv(self):
-        img = await self.queue.get()
+    def recv(self):
+        img = self.queue.get()
         frame = av.VideoFrame.from_ndarray(img, format="bgr24")
-        pts, time_base = await self.next_timestamp()
+        pts, time_base = self.next_timestamp()
         frame.pts = pts
         frame.time_base = time_base
         return frame
 
-video_track = ImageRenderingTrack()
-
-ctx2 = webrtc_streamer(
-    key="LiveFaceRecognition2",
-    mode=WebRtcMode.RECVONLY,
-    source_video_track=ctx.video_track,
-    desired_playing_state=ctx.state.playing,
-    rtc_configuration={"iceServers": ICE_SERVERS},
-    media_stream_constraints={"video": {"width": 1920}, "audio": False},
-)
+video_track = VideoImageTrack()
 
 grabber.thread.start()
 
 
-
-
-if ctx.state.playing:
-    # Start frame grabber in background thread
-    
-
-    # Start main loop
+def main_loop(grabber, video_track):
     while True:
         frame = grabber.get_frame()
         if frame is not None:
@@ -106,3 +91,16 @@ if ctx.state.playing:
 
             # Show Stream
             video_track.add_image(frame)
+
+threading.Thread(target=main_loop, args=(grabber, video_track)).start()
+
+
+if ctx.state.playing:
+    webrtc_streamer(
+        key="LiveFaceRecognition2",
+        mode=WebRtcMode.RECVONLY,
+        source_video_track=video_track,
+        desired_playing_state=ctx.state.playing,
+        #rtc_configuration={"iceServers": ICE_SERVERS},
+        media_stream_constraints={"video": {"width": 1920}, "audio": False},
+    )
