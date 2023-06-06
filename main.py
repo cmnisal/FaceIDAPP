@@ -13,10 +13,9 @@ import cv2
 from skimage.transform import SimilarityTransform
 from types import SimpleNamespace
 from sklearn.metrics.pairwise import cosine_distances
-"""This is only running locally, due to the problem, that st.image() is not able to update the image in the browser on time. Also the bandwidth is not enough to stream the video to the browser. There should be a streaming interface be used, which is not implemented yet. One could use webrtc for this. 
+"""FrameRate Calculation is not working, need to find a way to communicate between callback executions, to be able to set a current time and read it in the next execution. Also we have a severe lag in the video stream, need to find a way to improve it.
 
 """
-
 
 
 class Detection(SimpleNamespace):
@@ -38,21 +37,6 @@ class Match(SimpleNamespace):
     name: str = None
 
 
-class Grabber(object):
-    def __init__(self, video_receiver) -> None:
-        self.currentFrame = None
-        self.capture = video_receiver
-        self.thread = threading.Thread(target=self.update_frame)
-        self.thread.daemon = True
-
-    def update_frame(self) -> None:
-        while True:
-            self.currentFrame = self.capture.get_frame()
-
-    def get_frame(self) -> av.VideoFrame:
-        return self.currentFrame
-
-
 # Similarity threshold for face matching
 SIMILARITY_THRESHOLD = 1.2
 
@@ -68,13 +52,6 @@ st.title("Live Webcam Face Recognition")
 
 st.markdown("**Live Stream**")
 ctx_container = st.container()
-stream_container = st.empty()
-
-st.markdown("**Matches**")
-matches_container = st.info("No matches found yet ...")
-
-st.markdown("**Info**")
-info_container = st.empty()
 
 
 # Init face detector and face recognizer
@@ -196,7 +173,6 @@ def match_faces(subjects: List[Identity], gallery: List[Identity]) -> List[Match
 
 
 def draw_annotations(frame: np.ndarray, detections: List[Detection], matches: List[Match]) -> np.ndarray:
-    global timestamp
     shape = np.asarray(frame.shape[:2][::-1])
 
     # Upscale frame to 1080p for better visualization of drawn annotations
@@ -206,20 +182,6 @@ def draw_annotations(frame: np.ndarray, detections: List[Detection], matches: Li
 
     # Make frame writeable (for better performance)
     frame.flags.writeable = True
-
-    fps = 1 / (time.time() - timestamp)
-    timestamp = time.time()
-
-    # Draw FPS
-    cv2.putText(
-        frame,
-        f"FPS: {fps:.1f}",
-        (20, 40),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1,
-        (0, 255, 0),
-        2,
-    )
 
     # Draw Detections
     for detection in detections:
@@ -331,11 +293,11 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
     # Draw annotations
     frame = draw_annotations(frame, detections, matches)
-
+    
     # Convert frame back to av.VideoFrame
     frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
 
-    return frame, matches
+    return frame
 
 
 # Sidebar for face gallery
@@ -383,37 +345,8 @@ with st.sidebar:
 with ctx_container:
     ctx = webrtc_streamer(
         key="LiveFaceRecognition",
-        mode=WebRtcMode.SENDONLY,
+        mode=WebRtcMode.SENDRECV,
+        video_frame_callback=video_frame_callback,
         rtc_configuration={"iceServers": ICE_SERVERS},
         media_stream_constraints={"video": {"width": 1920}, "audio": False},
     )
-
-# Initialize frame grabber
-grabber = Grabber(ctx.video_receiver)
-
-if ctx.state.playing:
-    # Start frame grabber in background thread
-    grabber.thread.start()
-    timestamp = time.time()
-
-    # Start main loop
-    while True:
-        frame = grabber.get_frame()
-        if frame is not None:
-            # Run face detection and recognition
-            frame, matches = video_frame_callback(frame)
-
-            # Convert frame to numpy array
-            frame = frame.to_ndarray(format="rgb24")
-
-            # Show Stream
-            stream_container.image(frame, channels="RGB")
-
-            # Show Matches
-            if matches:
-                matches_container.image(
-                    image=[match.subject_id.face for match in matches],
-                    caption=[match.gallery_id.name for match in matches],
-                )
-            else:
-                matches_container.info("No matches found yet ...")
