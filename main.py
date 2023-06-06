@@ -1,106 +1,75 @@
-import streamlit as st
-import time
-from typing import List
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
-import av
-import numpy as np
-import onnxruntime as rt
-import threading
-import mediapipe as mp
-import os
-from twilio.rest import Client
-import cv2
-from skimage.transform import SimilarityTransform
-from types import SimpleNamespace
-from sklearn.metrics.pairwise import cosine_distances
 from aiortc import VideoStreamTrack
+import time
+import cv2
+import streamlit as st
+from av import VideoFrame
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import asyncio
+import threading
 
-
-class Grabber(object):
-    def __init__(self, video_receiver) -> None:
-        self.currentFrame = None
-        self.capture = video_receiver
-        self.grabber_thread = threading.Thread(target=self.update_frame)
-        self.grabber_thread.daemon = True
-
-    def update_frame(self) -> None:
-        while True:
-            self.currentFrame = self.capture.get_frame()
-
-    def get_frame(self) -> av.VideoFrame:
-        return self.currentFrame
-    
-# Similarity threshold for face matching
-SIMILARITY_THRESHOLD = 1.2
-
-# Get twilio ice server configuration using twilio credentials from environment variables (set in streamlit secrets)
-# Ref: https://www.twilio.com/docs/stun-turn/api
-ICE_SERVERS = Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"]).tokens.create().ice_servers
-
-# Set page layout for streamlit to wide
-st.set_page_config(layout="wide", page_title="Live Face Recognition", page_icon=":sunglasses:")
-
-# Streamlit app
-st.title("Live Webcam Face Recognition")
-
-st.markdown("**Live Stream**")
-ctx_container = st.container()
-stream_container = st.empty()
-
-# Start streaming component
+st.title("Live Stream")
 
 ctx = webrtc_streamer(
     key="LiveFaceRecognitionSender",
     mode=WebRtcMode.SENDONLY,
-    rtc_configuration={"iceServers": ICE_SERVERS},
     media_stream_constraints={"video": {"width": 1920}, "audio": False},
 )
 
-# Initialize frame grabber
-grabber = Grabber(ctx.video_receiver)
+class Grabber(object):
+    def __init__(self, video_receiver) -> None:
+        self.currentFrame = None
+        self.video_receiver = video_receiver
+        self.thread = threading.Thread(target=self.update_frame)
+        self.thread.daemon = True
+        self._stop = False
 
+    def start(self) -> None:
+        while self.video_receiver == None:
+            time.sleep(0.1)
+        self.thread.start()
 
-class VideoImageTrack(VideoStreamTrack):
-    def __init__(self):
-        super().__init__()
-        self.queue = asyncio.Queue(10)
+    def stop(self) -> None:
+        self._stop = True
+        self.thread.join()
 
-    def add_image(self, img: np.ndarray):
-        self.queue.put(img)
+    def update_frame(self) -> None:
+        while not self._stop:
+            self.currentFrame = self.video_receiver.get_frame()
 
-    def recv(self):
-        img = self.queue.get()
-        frame = av.VideoFrame.from_ndarray(img, format="bgr24")
-        pts, time_base = self.next_timestamp()
+    def read(self) -> VideoFrame:
+        frame = self.currentFrame.to_ndarray(format="bgr24")
+        pts, time_base = self.currentFrame.pts, self.currentFrame.time_base
+        cv2.putText(frame, "Hello World", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+        frame = VideoFrame.from_ndarray(frame, format="bgr24")
         frame.pts = pts
         frame.time_base = time_base
         return frame
+    
+class SimpleVideoTrack(VideoStreamTrack):
+    def __init__(self, grabber):
+        super().__init__()
+        self.grabber = grabber
 
-video_track = VideoImageTrack()
-
-grabber.thread.start()
-
-
-def main_loop(grabber, video_track):
-    while True:
-        frame = grabber.get_frame()
-        if frame is not None:
-            # Convert frame to numpy array
-            frame = frame.to_ndarray(format="rgb24")
-
-            # Show Stream
-            video_track.add_image(frame)
-
-threading.Thread(target=main_loop, args=(grabber, video_track)).start()
-
+    async def recv(self):
+        frame = self.grabber.read()
+        await asyncio.sleep(0.04)
+        print(f"VideoTrack: {frame.pts}, {frame.time_base}")
+        return frame
+    
+time.sleep(1)
+grabber = Grabber(ctx.video_receiver)
+video_track = SimpleVideoTrack(grabber)
 
 if ctx.state.playing:
+    grabber.start()
     webrtc_streamer(
-        key="LiveFaceRecognition2",
+        key="DisplayTrack",
         mode=WebRtcMode.RECVONLY,
         source_video_track=video_track,
-        desired_playing_state=ctx.state.playing,
-        #rtc_configuration={"iceServers": ICE_SERVERS},
-        media_stream_constraints={"video": {"width": 1920}, "audio": False},
+        desired_playing_state=True,
     )
+else:
+    try:
+        grabber.stop()
+    except:
+        pass
