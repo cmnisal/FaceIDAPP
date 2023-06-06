@@ -13,6 +13,10 @@ import cv2
 from skimage.transform import SimilarityTransform
 from types import SimpleNamespace
 from sklearn.metrics.pairwise import cosine_distances
+"""This is only running locally, due to the problem, that st.image() is not able to update the image in the browser on time. Also the bandwidth is not enough to stream the video to the browser. There should be a streaming interface be used, which is not implemented yet. One could use webrtc for this. 
+
+"""
+
 
 
 class Detection(SimpleNamespace):
