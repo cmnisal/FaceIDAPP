@@ -290,7 +290,7 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
     # Draw annotations
     frame = draw_annotations(frame, detections, matches)
-    
+
     # Convert frame back to av.VideoFrame
     frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
 
