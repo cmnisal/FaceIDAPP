@@ -1,11 +1,9 @@
 import streamlit as st
-import time
 from typing import List
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import av
 import numpy as np
 import onnxruntime as rt
-import threading
 import mediapipe as mp
 import os
 from twilio.rest import Client
