@@ -1,25 +1,27 @@
 import streamlit as st
-from typing import List
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
-import av
 import numpy as np
 import onnxruntime as rt
 import mediapipe as mp
 import os
-from twilio.rest import Client
 import cv2
+import av
+from typing import List
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
+from twilio.rest import Client
 from skimage.transform import SimilarityTransform
 from types import SimpleNamespace
 from sklearn.metrics.pairwise import cosine_distances
 
-# FrameRate Calculation is not working, need to find a way to communicate between callback executions, to be able to set a current time and read it in the next execution. Also we have a severe lag in the video stream, need to find a way to improve it.
 
+# ---------------------------------------------------------------------------------------------------------------------
 
+# Define a class to store a detection
 class Detection(SimpleNamespace):
     bbox: List[List[float]] = None
     landmarks: List[List[float]] = None
 
 
+# Define a class to store an identity
 class Identity(SimpleNamespace):
     detection: Detection = Detection()
     name: str = None
@@ -27,6 +29,7 @@ class Identity(SimpleNamespace):
     face: np.ndarray = None
 
 
+# Define a class to store a match
 class Match(SimpleNamespace):
     subject_id: Identity = Identity()
     gallery_id: Identity = Identity()
@@ -35,35 +38,25 @@ class Match(SimpleNamespace):
 
 
 # Similarity threshold for face matching
-SIMILARITY_THRESHOLD = 1.2
+SIMILARITY_THRESHOLD = 1.0
 
 # Get twilio ice server configuration using twilio credentials from environment variables (set in streamlit secrets)
 # Ref: https://www.twilio.com/docs/stun-turn/api
 ICE_SERVERS = Client(os.environ["TWILIO_ACCOUNT_SID"], os.environ["TWILIO_AUTH_TOKEN"]).tokens.create().ice_servers
-
-# Set page layout for streamlit to wide
-st.set_page_config(layout="wide", page_title="Live Face Recognition", page_icon=":sunglasses:")
-
-# Streamlit app
-st.title("Live Webcam Face Recognition")
-
-st.markdown("**Live Stream**")
-ctx_container = st.container()
-
+print(ICE_SERVERS)
 
 # Init face detector and face recognizer
-face_recognizer = rt.InferenceSession("model.fixed.onnx", providers=rt.get_available_providers())
-face_detector = mp.solutions.face_mesh.FaceMesh(
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5,
-    max_num_faces=5,
+FACE_RECOGNIZER = rt.InferenceSession("model.onnx", providers=rt.get_available_providers())
+FACE_DETECTOR = mp.solutions.face_mesh.FaceMesh(
+    refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5, max_num_faces=7
 )
+
+# ---------------------------------------------------------------------------------------------------------------------
 
 
 def detect_faces(frame: np.ndarray) -> List[Detection]:
     # Process the frame with the face detector
-    result = face_detector.process(frame)
+    result = FACE_DETECTOR.process(frame)
 
     # Initialize an empty list to store the detected faces
     detections = []
@@ -76,7 +69,9 @@ def detect_faces(frame: np.ndarray) -> List[Detection]:
             five_landmarks = np.asarray(detection.landmark)[[470, 475, 1, 57, 287]]
 
             # Extract the x and y coordinates of the landmarks of interest
-            landmarks = [[landmark.x * frame.shape[1], landmark.y * frame.shape[0]] for landmark in five_landmarks]
+            landmarks = np.asarray(
+                [[landmark.x * frame.shape[1], landmark.y * frame.shape[0]] for landmark in five_landmarks]
+            )
 
             # Extract the x and y coordinates of all landmarks
             all_x_coords = [landmark.x * frame.shape[1] for landmark in detection.landmark]
@@ -88,12 +83,7 @@ def detect_faces(frame: np.ndarray) -> List[Detection]:
             bbox = [[x_min, y_min], [x_max, y_max]]
 
             # Create a Detection object for the face
-            detection = Detection(
-                idx=count,
-                bbox=bbox,
-                landmarks=landmarks,
-                confidence=None,
-            )
+            detection = Detection(idx=count, bbox=bbox, landmarks=landmarks, confidence=None)
 
             # Add the detection to the list
             detections.append(detection)
@@ -129,7 +119,7 @@ def recognize_faces(frame: np.ndarray, detections: List[Detection]) -> List[Iden
         # INFERENCE -----------------------------------------------------------
         # Inference face embeddings with onnxruntime
         input_image = (np.asarray([face_aligned]).astype(np.float32) / 255.0).clip(0.0, 1.0)
-        embedding = face_recognizer.run(None, {"input_image": input_image})[0][0]
+        embedding = FACE_RECOGNIZER.run(None, {"input_image": input_image})[0][0]
         # ---------------------------------------------------------------------
 
         # Create Identity object
@@ -155,13 +145,7 @@ def match_faces(subjects: List[Identity], gallery: List[Identity]) -> List[Match
         dists_to_identity = cos_distances[ident_idx]
         idx_min = np.argmin(dists_to_identity)
         if dists_to_identity[idx_min] < SIMILARITY_THRESHOLD:
-            matches.append(
-                Match(
-                    subject_id=identity,
-                    gallery_id=gallery[idx_min],
-                    distance=dists_to_identity[idx_min],
-                )
-            )
+            matches.append(Match(subject_id=identity, gallery_id=gallery[idx_min], distance=dists_to_identity[idx_min]))
 
     # Sort Matches by identity_idx
     matches = sorted(matches, key=lambda match: match.gallery_id.name)
@@ -184,13 +168,7 @@ def draw_annotations(frame: np.ndarray, detections: List[Detection], matches: Li
     for detection in detections:
         # Draw Landmarks
         for landmark in detection.landmarks:
-            cv2.circle(
-                frame,
-                (landmark * upscale_factor).astype(int),
-                2,
-                (255, 255, 255),
-                -1,
-            )
+            cv2.circle(frame, (landmark * upscale_factor).astype(int), 2, (255, 255, 255), -1)
 
         # Draw Bounding Box
         cv2.rectangle(
@@ -297,53 +275,58 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     return frame
 
 
-# Sidebar for face gallery
-with st.sidebar:
-    st.markdown("# Face Gallery")
-    files = st.sidebar.file_uploader(
-        "Upload images to gallery",
-        type=["png", "jpg", "jpeg"],
-        accept_multiple_files=True,
-        label_visibility="collapsed",
-    )
+# ---------------------------------------------------------------------------------------------------------------------
 
-    # Init gallery
-    gallery = []
-    for file in files:
-        # Read file bytes
-        file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
+# Streamlit app configuration
+# Set page layout for streamlit to wide
+st.set_page_config(layout="wide", page_title="Live Webcam Face Recognition", page_icon=":sunglasses:")
 
-        # Decode image and convert from BGR to RGB
-        img = cv2.cvtColor(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+# Title
+st.title("Live Webcam Face Recognition")
 
-        # Detect faces
-        detections = detect_faces(img)
+# Face gallery
+st.markdown("**Face Gallery**")
+gal_container = st.container()
+files = gal_container.file_uploader(
+    "Upload images to gallery",
+    type=["png", "jpg", "jpeg"],
+    accept_multiple_files=True,
+    label_visibility="collapsed",
+)
 
-        if detections:
-            # recognize faces
-            subjects = recognize_faces(img, detections[:1])
+# Process uploaded files and add to gallery
+gallery = []
+for file in files:
+    # Read file bytes
+    file_bytes = np.asarray(bytearray(file.read()), dtype=np.uint8)
 
-            # Add subjects to gallery
-            gallery.append(
-                Identity(
-                    name=os.path.splitext(file.name)[0],
-                    embedding=subjects[0].embedding,
-                    face=subjects[0].face,
-                )
-            )
+    # Decode image and convert from BGR to RGB
+    img = cv2.cvtColor(cv2.imdecode(file_bytes, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
 
-    # Show gallery images
-    st.image(
-        image=[identity.face for identity in gallery],
-        caption=[identity.name for identity in gallery],
-    )
+    # Detect faces
+    detections = detect_faces(img)
+
+    if detections:
+        # recognize faces
+        subjects = recognize_faces(img, detections[:1])  # take only one face
+
+        # Add subjects to gallery
+        gallery.append(
+            Identity(name=os.path.splitext(file.name)[0], embedding=subjects[0].embedding, face=subjects[0].face)
+        )
+
+# Preview gallery images
+gal_container.image(image=[identity.face for identity in gallery], caption=[identity.name for identity in gallery])
+
+# Main window for stream
+st.markdown("**Live Stream**")
 
 # Start streaming component
-with ctx_container:
+with st.container():
     ctx = webrtc_streamer(
         key="LiveFaceRecognition",
         mode=WebRtcMode.SENDRECV,
         video_frame_callback=video_frame_callback,
         rtc_configuration={"iceServers": ICE_SERVERS},
-        media_stream_constraints={"video": {"width": 1920}, "audio": False},
+        media_stream_constraints={"video": {"width": 1280}, "audio": False},
     )
