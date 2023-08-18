@@ -18,6 +18,7 @@ URLS = {
     "MobileNetV2ONNX": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/MobileNetV2.onnx",
     "FaceTransformerOctupletLossPT": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/FaceTransformerOctupletLoss.pt",
     "ArcFaceOctupletLossTF": "https://github.com/Martlgap/octuplet-loss/releases/download/modelweights/ArcFaceOctupletLoss.tf.zip",
+    "ResNet50ONNX": "https://github.com/Martlgap/FaceIDLight/releases/download/v.0.1/ResNet50.onnx",
 }
 
 FILE_HASHES = {
@@ -30,6 +31,7 @@ FILE_HASHES = {
     "ArcFaceOctupletLossTF": "8603f374fd385081ce5ce80f5997e3363f4247c8bbad0b8de7fb26a80468eeea",
     "FaceTransformerOctupletLossONNX": "aa995cce8b137ccdc65b394cc57c6b1fdafc7012ce5197e62a4cf8d8e61db4f2",
     "MobileNetV2ONNX": "6f53fb10f0db558403f73cfe744a96b12d763bdf1294a38d14ef14307d61ecf3",
+    "ResNet50ONNX": "2816d8f4e455525e5f31cd511e1c3f2f677efceefda9fc114e3ac350acc681b7",
 }
 
 
@@ -174,6 +176,14 @@ class MobileNetV2ONNX(ONNXModel):
     # TODO somehow show if CPU or GPU is used?
     def __call__(self, imgs):
         return self._inference(self.sess, imgs)
+    
+
+class ResNet50ONNX(ONNXModel):
+    def __init__(self) -> None:
+        self.sess = rt.InferenceSession(get_file(URLS["ResNet50ONNX"], FILE_HASHES["ResNet50ONNX"]), providers=rt.get_available_providers())
+
+    def __call__(self, imgs):
+        return self.sess.run(None, {"args_0": imgs.astype(np.float32)})[0]
 
 
 class FaceTransformerOctupletLossONNX(ONNXModel):
